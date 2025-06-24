@@ -24,10 +24,10 @@
 
 ---
 
-## 🔊 3. **Interactive Waveform Timeline**
+## 🔊 3. **Interactive Waveform Timeline for Scholars Review**
 
 -   [ ] Display waveform of recorded audio.
--   [ ] Users can **zoom in/out** of the waveform for fine navigation.
+-   [ ] Scholars can **zoom in/out** of the waveform for fine navigation.
 -   [ ] **Timeline rulers** show time in seconds.
 -   [ ] Clickable waveform: seek to any point in the audio.
 
@@ -35,9 +35,9 @@
 
 ## 🔖 4. **Markers & Repeat Loops**
 
--   [ ] Users can **add custom markers** to specific timestamps.
+-   [ ] Scholars can **add custom markers** to specific timestamps.
 -   [ ] Each marker can include a **label** (e.g., “tough pronunciation”).
--   [ ] Users can **select a range** to loop (A/B repeat playback).
+-   [ ] Scholars can **select a range** to loop (A/B repeat playback).
 -   [ ] Markers are stored locally and optionally uploaded with the recitation.
 
 ---
@@ -56,10 +56,10 @@
 
 ---
 
-## 🎧 6. **Feedback Playback**
+## 🎧 6. **Student Feedback Playback**
 
--   [ ] Users can view a **list of comments** (text/audio).
--   [ ] Users can click any comment to **jump to the exact timestamp**.
+-   [ ] Student can view a **list of comments** (text/audio).
+-   [ ] Student can click any comment to **jump to the exact timestamp**.
 -   [ ] Repeat listening to scholar’s comment or the relevant audio segment.
 -   [ ] Mark comments as **resolved**, or revisit them later.
 

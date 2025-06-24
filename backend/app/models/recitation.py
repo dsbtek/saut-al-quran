@@ -4,10 +4,12 @@ from sqlalchemy.orm import relationship
 from app.db.database import Base
 import enum
 
+
 class RecitationStatus(str, enum.Enum):
     PENDING = "pending"
     REVIEWED = "reviewed"
     NEEDS_REVISION = "needs_revision"
+
 
 class Recitation(Base):
     __tablename__ = "recitations"
@@ -28,3 +30,4 @@ class Recitation(Base):
     user = relationship("User", back_populates="recitations")
     comments = relationship("Comment", back_populates="recitation")
     markers = relationship("Marker", back_populates="recitation")
+    loop_regions = relationship("LoopRegion", back_populates="recitation")

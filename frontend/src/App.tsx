@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage';
 import RecordingPage from './pages/RecordingPage';
 import FeedbackPage from './pages/FeedbackPage';
 import ScholarDashboard from './pages/ScholarDashboard';
+import ScholarReviewPage from './pages/ScholarReviewPage';
 import CommunitiesPage from './pages/CommunitiesPage';
 import DonationsPage from './pages/DonationsPage';
 import UserFeedbackPage from './pages/UserFeedbackPage';
@@ -87,6 +88,10 @@ const AppContent: React.FC = () => {
                         <Route path="/record" element={<RecordingPage />} />
                         <Route path="/feedback" element={<FeedbackPage />} />
                         <Route path="/scholar" element={<ScholarDashboard />} />
+                        <Route
+                            path="/scholar/review/:recitationId"
+                            element={<ScholarReviewPage />}
+                        />
                         <Route
                             path="/communities"
                             element={<CommunitiesPage />}

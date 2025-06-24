@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { RecitationWithDetails } from '../types';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import WaveformPlayer from '../components/WaveformPlayer';
+import ScholarWaveformPlayer from '../components/ScholarWaveformPlayer';
 
 const ScholarDashboard: React.FC = () => {
     const { user } = useAuth();
@@ -246,8 +246,8 @@ const ScholarDashboard: React.FC = () => {
 
                     {getAudioUrl(selectedRecitation) && (
                         <div style={{ marginBottom: '30px' }}>
-                            <h4>Audio Review</h4>
-                            <WaveformPlayer
+                            <h4>Audio Review with Advanced Tools</h4>
+                            <ScholarWaveformPlayer
                                 audioUrl={getAudioUrl(selectedRecitation)}
                                 markers={selectedRecitation.markers || []}
                                 onMarkerClick={(marker) => {
@@ -256,6 +256,20 @@ const ScholarDashboard: React.FC = () => {
                                         timestamp: marker.timestamp,
                                     });
                                 }}
+                                onMarkerAdd={(timestamp) => {
+                                    setCommentForm({
+                                        ...commentForm,
+                                        timestamp: timestamp,
+                                    });
+                                }}
+                                onTimeUpdate={(currentTime) => {
+                                    // Update timestamp in comment form when audio plays
+                                    setCommentForm({
+                                        ...commentForm,
+                                        timestamp: currentTime,
+                                    });
+                                }}
+                                height={150}
                             />
                         </div>
                     )}
