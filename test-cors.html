@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>CORS Test</h1>
+    <button onclick="testRegistration()">Test Registration</button>
+    <div id="result"></div>
+
+    <script>
+        async function testRegistration() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost/api/v1/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'corstest@example.com',
+                        username: 'corstest' + Date.now(),
+                        full_name: 'CORS Test User',
+                        password: 'testpass123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<p style="color: green;">SUCCESS: ${JSON.stringify(data, null, 2)}</p>`;
+                } else {
+                    const error = await response.text();
+                    resultDiv.innerHTML = `<p style="color: orange;">API Error: ${error}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">CORS Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

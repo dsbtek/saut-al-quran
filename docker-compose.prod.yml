@@ -1,0 +1,25 @@
+services:
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile.prod
+        environment:
+            - NODE_ENV=production
+        volumes: [] # Remove development volumes
+
+    backend:
+        environment:
+            - ENVIRONMENT=production
+        volumes: [] # Remove development volumes
+        restart: unless-stopped
+
+    db:
+        restart: unless-stopped
+        volumes:
+            - postgres_data_prod:/var/lib/postgresql/data
+
+    nginx:
+        restart: unless-stopped
+
+volumes:
+    postgres_data_prod:
