@@ -4,10 +4,12 @@ from sqlalchemy.orm import relationship
 from app.db.database import Base
 import enum
 
+
 class UserRole(str, enum.Enum):
     USER = "user"
     SCHOLAR = "scholar"
     ADMIN = "admin"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -25,5 +27,14 @@ class User(Base):
 
     # Relationships
     recitations = relationship("Recitation", back_populates="user")
-    comments_given = relationship("Comment", foreign_keys="Comment.scholar_id", back_populates="scholar")
-    comments_received = relationship("Comment", foreign_keys="Comment.user_id", back_populates="user")
+    comments_given = relationship(
+        "Comment", foreign_keys="Comment.scholar_id", back_populates="scholar")
+    comments_received = relationship(
+        "Comment", foreign_keys="Comment.user_id", back_populates="user")
+    created_communities = relationship(
+        "Community", foreign_keys="Community.created_by", back_populates="creator")
+    community_memberships = relationship(
+        "CommunityMembership", back_populates="user")
+    communities = relationship(
+        "Community", secondary="community_memberships", back_populates="members", viewonly=True)
+    donations = relationship("Donation", back_populates="user")

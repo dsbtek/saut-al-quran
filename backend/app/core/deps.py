@@ -9,6 +9,7 @@ from app.schemas.user import TokenData
 
 security = HTTPBearer()
 
+
 def get_current_user(
     db: Session = Depends(get_db),
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -18,21 +19,23 @@ def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     username = verify_token(credentials.credentials)
     if username is None:
         raise credentials_exception
-    
+
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise credentials_exception
-    
+
     return user
+
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
 
 def get_current_scholar(current_user: User = Depends(get_current_active_user)) -> User:
     if current_user.role not in [UserRole.SCHOLAR, UserRole.ADMIN]:
@@ -42,6 +45,7 @@ def get_current_scholar(current_user: User = Depends(get_current_active_user)) -
         )
     return current_user
 
+
 def get_current_admin(current_user: User = Depends(get_current_active_user)) -> User:
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
@@ -49,3 +53,35 @@ def get_current_admin(current_user: User = Depends(get_current_active_user)) -> 
             detail="Not enough permissions"
         )
     return current_user
+
+
+def get_current_admin_or_scholar(current_user: User = Depends(get_current_active_user)) -> User:
+    if current_user.role not in [UserRole.ADMIN, UserRole.SCHOLAR]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+    return current_user
+
+
+def get_current_user_optional(
+    db: Session = Depends(get_db),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
+        HTTPBearer(auto_error=False))
+) -> Optional[User]:
+    """
+    Get current user if authenticated, otherwise return None.
+    Used for endpoints that can work with or without authentication.
+    """
+    if not credentials:
+        return None
+
+    try:
+        username = verify_token(credentials.credentials)
+        if username is None:
+            return None
+
+        user = db.query(User).filter(User.username == username).first()
+        return user
+    except Exception:
+        return None

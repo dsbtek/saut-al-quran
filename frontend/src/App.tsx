@@ -6,6 +6,9 @@ import HomePage from './pages/HomePage';
 import RecordingPage from './pages/RecordingPage';
 import FeedbackPage from './pages/FeedbackPage';
 import ScholarDashboard from './pages/ScholarDashboard';
+import CommunitiesPage from './pages/CommunitiesPage';
+import DonationsPage from './pages/DonationsPage';
+import UserFeedbackPage from './pages/UserFeedbackPage';
 import AuthForm from './components/AuthForm';
 import OfflineIndicator from './components/OfflineIndicator';
 
@@ -84,6 +87,15 @@ const AppContent: React.FC = () => {
                         <Route path="/record" element={<RecordingPage />} />
                         <Route path="/feedback" element={<FeedbackPage />} />
                         <Route path="/scholar" element={<ScholarDashboard />} />
+                        <Route
+                            path="/communities"
+                            element={<CommunitiesPage />}
+                        />
+                        <Route path="/donations" element={<DonationsPage />} />
+                        <Route
+                            path="/user-feedback"
+                            element={<UserFeedbackPage />}
+                        />
                     </Routes>
                 </main>
             </div>
