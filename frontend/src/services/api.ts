@@ -7,6 +7,7 @@ import {
     LoginCredentials,
     RegisterData,
     RecitationWithDetails,
+    RecitationAudioResponse,
 } from '../types';
 import { offlineStorage } from './offlineStorage';
 
@@ -50,24 +51,35 @@ class ApiService {
     }
 
     private async request<T>(
-        endpoint: string,
-        options: RequestInit = {},
-    ): Promise<T> {
-        const url = `${this.baseURL}${endpoint}`;
-        const config: RequestInit = {
-            headers: this.getHeaders(),
-            ...options,
-        };
+    endpoint: string,
+    options: RequestInit = {},
+): Promise<T> {
+    const url = `${this.baseURL}${endpoint}`;
+    const config: RequestInit = {
+        headers: this.getHeaders(),
+        ...options,
+    };
 
-        const response = await fetch(url, config);
+    const response = await fetch(url, config);
 
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error || `HTTP error! status: ${response.status}`);
-        }
-
-        return response.json();
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || `HTTP error! status: ${response.status}`);
     }
+
+    // Detect if the response is binary (audio, image, pdf, etc.)
+    const contentType = response.headers.get("Content-Type") || "";
+
+    if (contentType.startsWith("audio/") || contentType.includes("octet-stream")) {
+        // Return blob for audio file
+        const blob = await response.blob();
+        return blob as unknown as T;
+    }
+
+    // Default JSON
+    return response.json() as Promise<T>;
+}
+
 
     // Auth methods
     async login(credentials: LoginCredentials): Promise<AuthTokens> {
@@ -164,6 +176,10 @@ class ApiService {
 
     async getPendingRecitations(): Promise<RecitationWithDetails[]> {
         return this.request<RecitationWithDetails[]>('/recitations/pending');
+    }
+
+    async getRecitationAudio(id: number): Promise<RecitationAudioResponse> {
+        return this.request<RecitationAudioResponse>(`/recitations/audio/${id}`);
     }
 
     // Comment methods

@@ -226,7 +226,3 @@ MIT License. © 2024 Muhammad & Contributors
 ---
 
 **Saut Al-Qur’an – Amplify your recitation. Beautify your connection.**
-
-```
-
-```

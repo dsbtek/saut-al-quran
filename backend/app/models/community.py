@@ -20,7 +20,7 @@ class Community(Base):
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_communities")
     memberships = relationship("CommunityMembership", back_populates="community", cascade="all, delete-orphan")
     members = relationship("User", secondary="community_memberships", back_populates="communities", viewonly=True)
-
+    model_config = {"from_attributes": True}
 class CommunityMembership(Base):
     __tablename__ = "community_memberships"
 
@@ -35,7 +35,7 @@ class CommunityMembership(Base):
     # Relationships
     community = relationship("Community", back_populates="memberships")
     user = relationship("User", back_populates="community_memberships")
-
+    model_config = {"from_attributes": True}
 class CommunityInvitation(Base):
     __tablename__ = "community_invitations"
 
@@ -52,3 +52,4 @@ class CommunityInvitation(Base):
     # Relationships
     community = relationship("Community")
     inviter = relationship("User")
+    model_config = {"from_attributes": True}

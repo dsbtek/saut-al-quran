@@ -53,6 +53,12 @@ export interface RecitationWithDetails extends Recitation {
     markers?: Marker[];
 }
 
+export interface RecitationAudioResponse {
+    path: string;
+    media_type?: string;
+    filename?: string;
+}
+
 export interface AuthTokens {
     access_token: string;
     token_type: string;

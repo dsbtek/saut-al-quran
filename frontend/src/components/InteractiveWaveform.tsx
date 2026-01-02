@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
 interface Marker {
@@ -23,6 +23,7 @@ interface InteractiveWaveformProps {
     onMarkerClick?: (marker: Marker) => void;
     onRegionSelect?: (start: number, end: number) => void;
     onTimeUpdate?: (currentTime: number) => void;
+    onDuration?: (duration: number) => void;
     height?: number;
     waveColor?: string;
     progressColor?: string;
@@ -30,22 +31,26 @@ interface InteractiveWaveformProps {
     responsive?: boolean;
 }
 
-const InteractiveWaveform: React.FC<InteractiveWaveformProps> = ({
-    audioUrl,
-    markers = [],
-    loopRegions = [],
-    onMarkerAdd,
-    onMarkerClick,
-    onRegionSelect,
-    onTimeUpdate,
-    height = 128,
-    waveColor = '#d1d5db',
-    progressColor = '#3b82f6',
-    cursorColor = '#ef4444',
-    responsive = true
-}) => {
+const InteractiveWaveform: React.FC<any> = (props) => {
+    const {
+        audioUrl,
+        markers = [],
+        loopRegions = [],
+        onMarkerAdd,
+        onMarkerClick,
+        onRegionSelect,
+        onTimeUpdate,
+        onDuration,
+        height = 128,
+        waveColor = '#d1d5db',
+        progressColor = '#3b82f6',
+        cursorColor = '#ef4444',
+        responsive = true
+    } = props;
+
     const waveformRef = useRef<HTMLDivElement>(null);
     const wavesurfer = useRef<WaveSurfer | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -121,7 +126,7 @@ const InteractiveWaveform: React.FC<InteractiveWaveformProps> = ({
     }, [zoom]);
 
     // Handle double-click to add markers
-    const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const handleDoubleClick = (e: React.MouseEvent) => {
         if (!wavesurfer.current || !onMarkerAdd) return;
 
         const rect = waveformRef.current?.getBoundingClientRect();
@@ -132,7 +137,7 @@ const InteractiveWaveform: React.FC<InteractiveWaveformProps> = ({
         const time = progress * wavesurfer.current.getDuration();
         
         onMarkerAdd(time);
-    }, [onMarkerAdd]);
+    };
 
     // Playback controls
     const togglePlayPause = () => {
@@ -158,6 +163,52 @@ const InteractiveWaveform: React.FC<InteractiveWaveformProps> = ({
     const zoomIn = () => setZoom(prev => Math.min(prev * 1.5, 10));
     const zoomOut = () => setZoom(prev => Math.max(prev / 1.5, 1));
     const resetZoom = () => setZoom(1);
+
+    // keep a stable ref to the onTimeUpdate callback so event listeners don't have to be reattached
+    const onTimeUpdateRef = useRef<typeof props.onTimeUpdate | null>(null);
+    const onDurationRef = useRef<typeof props.onDuration | null>(null);
+
+    useEffect(() => {
+        onTimeUpdateRef.current = props.onTimeUpdate ?? null;
+    }, [props.onTimeUpdate]);
+
+    useEffect(() => {
+        onDurationRef.current = props.onDuration ?? null;
+    }, [props.onDuration]);
+
+    // attach listeners to audio element for loadedmetadata and timeupdate
+    useEffect(() => {
+        const audioEl = audioRef.current;
+        if (!audioEl) return;
+
+        const handleLoadedMetadata = () => {
+            const d = audioEl.duration;
+            if (onDurationRef.current) {
+                try { onDurationRef.current(d); } catch (e) { /* swallow callback errors */ }
+            }
+        };
+
+        // timeupdate is sufficient; we forward currentTime via stable ref
+        const handleTimeUpdate = () => {
+            const t = audioEl.currentTime;
+            if (onTimeUpdateRef.current) {
+                try { onTimeUpdateRef.current(t); } catch (e) { /* swallow callback errors */ }
+            }
+        };
+
+        audioEl.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audioEl.addEventListener('timeupdate', handleTimeUpdate);
+
+        // also call duration immediately if metadata already loaded
+        if (!isNaN(audioEl.duration) && audioEl.duration > 0) {
+            handleLoadedMetadata();
+        }
+
+        return () => {
+            audioEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            audioEl.removeEventListener('timeupdate', handleTimeUpdate);
+        };
+    }, [props.audioUrl]);
 
     if (error) {
         return (
@@ -314,6 +365,8 @@ const InteractiveWaveform: React.FC<InteractiveWaveformProps> = ({
             }}>
                 Double-click on waveform to add markers • Click markers to edit • Use zoom controls for precision
             </div>
+
+            <audio ref={audioRef} src={audioUrl} preload="metadata" style={{ display: 'none' }} />
         </div>
     );
 };

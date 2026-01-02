@@ -61,7 +61,6 @@ const RecordingPage: React.FC = () => {
             reader.onloadend = async () => {
                 const base64Audio = reader.result as string;
                 const base64Data = base64Audio.split(',')[1]; // Remove data:audio/webm;base64, prefix
-
                 await apiService.createRecitation({
                     surah_name: selectedSurah,
                     ayah_start: ayahRange.start,

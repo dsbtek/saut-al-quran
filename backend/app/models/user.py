@@ -38,3 +38,4 @@ class User(Base):
     communities = relationship(
         "Community", secondary="community_memberships", back_populates="members", viewonly=True)
     donations = relationship("Donation", back_populates="user")
+    model_config = {"from_attributes": True}

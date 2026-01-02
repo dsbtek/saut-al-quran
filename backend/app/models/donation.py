@@ -55,7 +55,7 @@ class Donation(Base):
 
     # Relationships
     user = relationship("User", back_populates="donations")
-
+    model_config = {"from_attributes": True}
 class DonationCampaign(Base):
     __tablename__ = "donation_campaigns"
 
@@ -106,3 +106,4 @@ class UserFeedback(Base):
     # Relationships
     user = relationship("User", foreign_keys=[user_id])
     resolver = relationship("User", foreign_keys=[resolved_by])
+    model_config = {"from_attributes": True}

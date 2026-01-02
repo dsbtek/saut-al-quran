@@ -1,15 +1,32 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.api.api_v1.api import api_router
 from app.db.init_db import create_tables, create_initial_data
 from app.db.database import SessionLocal
+import os
 
+class CustomStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        print(f"Serving static file: {path}")
+        response = await super().get_response(path, scope)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+    
 app = FastAPI(
     title="Saut Al-Qur'an API",
     description="API for Qur'an recitation recording and scholar feedback",
     version="1.0.0",
 )
+
+# Ensure uploads directory exists
+os.makedirs("app/uploads", exist_ok=True)
+
+# Serve static files correctly
+app.mount("/files/", CustomStaticFiles(directory="app/uploads/audio"), name="files")
 
 # Set up CORS
 app.add_middleware(
@@ -19,14 +36,13 @@ app.add_middleware(
         "http://localhost",       # Nginx proxy access
         "http://localhost:80",    # Explicit port 80
     ],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
-
 
 @app.on_event("startup")
 async def startup_event():
@@ -38,11 +54,9 @@ async def startup_event():
     finally:
         db.close()
 
-
 @app.get("/")
 async def root():
     return {"message": "Saut Al-Qur'an API is running"}
-
 
 @app.get("/health")
 async def health_check():

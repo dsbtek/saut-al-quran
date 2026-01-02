@@ -21,3 +21,4 @@ class Comment(Base):
     recitation = relationship("Recitation", back_populates="comments")
     scholar = relationship("User", foreign_keys=[scholar_id], back_populates="comments_given")
     user = relationship("User", foreign_keys=[user_id], back_populates="comments_received")
+    model_config = {"from_attributes": True}

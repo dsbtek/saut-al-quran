@@ -10,7 +10,10 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
+# Create a non-root user and set proper permissions
+RUN adduser --disabled-password --gecos '' myuser
+RUN mkdir -p /app/uploads/audio /app/uploads/images
+RUN chown -R myuser:myuser /app/uploads
 # Copy application code
 COPY . .
 

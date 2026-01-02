@@ -23,7 +23,7 @@ class Marker(Base):
     # Relationships
     recitation = relationship("Recitation", back_populates="markers")
     scholar = relationship("User", foreign_keys=[scholar_id])
-
+    model_config = {"from_attributes": True}
 
 class LoopRegion(Base):
     __tablename__ = "loop_regions"

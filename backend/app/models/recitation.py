@@ -31,3 +31,4 @@ class Recitation(Base):
     comments = relationship("Comment", back_populates="recitation")
     markers = relationship("Marker", back_populates="recitation")
     loop_regions = relationship("LoopRegion", back_populates="recitation")
+    model_config = {"from_attributes": True}

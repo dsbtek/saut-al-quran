@@ -21,6 +21,8 @@ services:
             - db
         volumes:
             - ./backend:/app
+        user: "${UID:-1000}:${GID:-1000}"
+        restart: unless-stopped
 
     db:
         image: postgres:15
