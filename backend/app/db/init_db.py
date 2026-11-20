@@ -11,6 +11,8 @@ from app.models import (
     CommunityMembership,
     IslamiyyaClass,
     ClassCategory,
+    IslamicSubject,
+    ClassBook,
     PublicLecture,
     LectureStreamTarget,
     LectureStatus,
@@ -119,6 +121,48 @@ def create_initial_data(db: Session):
             ),
         ])
 
+        fiqh_class = IslamiyyaClass(
+            community_id=islamiyya.id,
+            scholar_id=scholar_user.id,
+            created_by=manager_user.id,
+            title="Foundations of Fiqh & Ibadah",
+            description="Practical Islamic jurisprudence covering Purification (Taharah), Salah, and Zakah.",
+            subject=IslamicSubject.FIQH,
+            category=ClassCategory.GENERAL,
+            schedule_days="Mon, Thu",
+            start_time="18:30",
+            end_time="19:30",
+            surah_focus="Kitab al-Taharah & Salah",
+        )
+        db.add(fiqh_class)
+        db.flush()
+
+        db.add_all([
+            ClassBook(
+                class_id=fiqh_class.id,
+                uploaded_by=scholar_user.id,
+                title="Al-Akhdari (Mukhtasar in Maliki Fiqh)",
+                author="Imam Abdurrahman al-Akhdari",
+                description="Essential primer on purification and prayer.",
+                session_name="2026 Term 1",
+                is_free=True,
+                price=0,
+                external_url="https://archive.org/details/al-akhdari",
+            ),
+            ClassBook(
+                class_id=fiqh_class.id,
+                uploaded_by=scholar_user.id,
+                title="Annotated Fiqh Workbook & Study Guide",
+                author="Sheikh Ahmad",
+                description="Printed & digital session workbook with exercises.",
+                session_name="2026 Term 1",
+                is_free=False,
+                price=2500,
+                currency="NGN",
+                external_url="https://example.com/fiqh-workbook.pdf",
+            ),
+        ])
+
         db.add_all([
             IslamiyyaClass(
                 community_id=islamiyya.id,
@@ -126,6 +170,7 @@ def create_initial_data(db: Session):
                 created_by=manager_user.id,
                 title="Children's Juz Amma & Makharij",
                 description="Foundational Arabic letters, short surahs, and joyful memorization for ages 6–12.",
+                subject=IslamicSubject.QURAN_TAJWEED,
                 category=ClassCategory.CHILDREN,
                 schedule_days="Sat, Sun",
                 start_time="09:00",
@@ -138,6 +183,7 @@ def create_initial_data(db: Session):
                 created_by=manager_user.id,
                 title="Adult Brothers Tajweed Mastery",
                 description="Applied Ahkam al-Tajweed with live recitation correction.",
+                subject=IslamicSubject.QURAN_TAJWEED,
                 category=ClassCategory.ADULT_MALE,
                 schedule_days="Tue, Thu",
                 start_time="19:30",
@@ -150,6 +196,7 @@ def create_initial_data(db: Session):
                 created_by=manager_user.id,
                 title="Adult Sisters Hifz & Fluency Circle",
                 description="Supportive recitation and memorization circle for adult sisters.",
+                subject=IslamicSubject.QURAN_TAJWEED,
                 category=ClassCategory.ADULT_WOMEN,
                 schedule_days="Wed, Sat",
                 start_time="16:00",

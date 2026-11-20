@@ -24,19 +24,19 @@ export const QuranicVerseBanner: React.FC = () => (
 export const WelcomePillars: React.FC = () => {
     const pillars = [
         {
-            icon: '🎙️',
-            title: 'Recite & Submit',
-            desc: 'Choose any of the 114 Surahs, record with real-time visualization, and upload even on low-bandwidth connections.',
+            icon: '📖',
+            title: 'All Islamic Sciences',
+            desc: "Learn Qur'an & Tajweed, Fiqh, Hadith, Aqidah, Seerah, Tafsir, and Arabic in structured Islamiyya classes.",
         },
         {
             icon: '🎧',
-            title: 'Scholar Tajweed Review',
-            desc: 'Certified scholars annotate your waveform with timestamped text, voice notes, and A/B repeat practice loops.',
+            title: 'Full Qur\'an Hifz & Review',
+            desc: 'Listen to full Qur\'an recitations offline with Ayah repeat loops, then record for certified scholar feedback.',
         },
         {
-            icon: '🕌',
-            title: 'Islamiyya Circles & Classes',
-            desc: 'Join local Islamiyyas and enroll in dedicated Children, Adult Male, and Adult Women classes.',
+            icon: '📚',
+            title: 'Class Session Books',
+            desc: 'Scholars attach free or paid study books (kitabs) to each class session for enrolled students.',
         },
         {
             icon: '📡',

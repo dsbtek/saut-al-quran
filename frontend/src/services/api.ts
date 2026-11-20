@@ -14,6 +14,9 @@ import {
     CommunityMembership,
     IslamiyyaClass,
     ClassCategory,
+    IslamicSubject,
+    ClassBook,
+    BookPurchase,
     ClassEnrollment,
     PublicLecture,
     LectureStreamTarget,
@@ -404,6 +407,7 @@ class ApiService {
         community_id: number;
         title: string;
         description?: string;
+        subject?: IslamicSubject;
         category: ClassCategory;
         schedule_days?: string;
         start_time?: string;
@@ -414,6 +418,72 @@ class ApiService {
             method: 'POST',
             body: JSON.stringify(data),
         });
+    }
+
+    // Class Session Books (Free / Paid)
+    async getClassBooks(classId: number): Promise<ClassBook[]> {
+        return this.request<ClassBook[]>(`/books/class/${classId}`);
+    }
+
+    async uploadClassBook(params: {
+        class_id: number;
+        title: string;
+        session_name: string;
+        author?: string;
+        description?: string;
+        available_from?: string;
+        available_until?: string;
+        is_free: boolean;
+        price?: number;
+        currency?: string;
+        external_url?: string;
+        file?: File;
+    }): Promise<ClassBook> {
+        const formData = new FormData();
+        formData.append('class_id', String(params.class_id));
+        formData.append('title', params.title);
+        formData.append('session_name', params.session_name);
+        if (params.author) formData.append('author', params.author);
+        if (params.description) formData.append('description', params.description);
+        if (params.available_from) formData.append('available_from', params.available_from);
+        if (params.available_until) formData.append('available_until', params.available_until);
+        formData.append('is_free', String(params.is_free));
+        formData.append('price', String(params.price || 0));
+        formData.append('currency', params.currency || 'NGN');
+        if (params.external_url) formData.append('external_url', params.external_url);
+        if (params.file) formData.append('file', params.file);
+
+        return this.request<ClassBook>(
+            '/books/',
+            { method: 'POST', body: formData },
+            true,
+        );
+    }
+
+    async initiateBookPurchase(
+        bookId: number,
+        paymentProvider: 'paystack' | 'stripe' | 'bank_transfer' = 'paystack',
+    ): Promise<BookPurchase> {
+        return this.request<BookPurchase>(`/books/${bookId}/purchase`, {
+            method: 'POST',
+            body: JSON.stringify({ payment_provider: paymentProvider }),
+        });
+    }
+
+    async confirmBookPurchase(purchaseId: number): Promise<BookPurchase> {
+        return this.request<BookPurchase>(`/books/purchases/${purchaseId}/confirm`, {
+            method: 'POST',
+        });
+    }
+
+    async downloadClassBook(bookId: number): Promise<Blob> {
+        const url = `${this.baseURL}/books/${bookId}/download`;
+        const response = await fetch(url, { headers: this.getHeaders(false) });
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(err || 'Failed to download book');
+        }
+        return response.blob();
     }
 
     async requestClassEnrollment(classId: number): Promise<ClassEnrollment> {

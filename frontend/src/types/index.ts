@@ -135,6 +135,52 @@ export interface Community {
 
 export type ClassCategory = 'children' | 'adult_male' | 'adult_women' | 'youth' | 'general';
 
+export type IslamicSubject =
+    | 'quran_tajweed'
+    | 'fiqh'
+    | 'aqidah'
+    | 'hadith'
+    | 'seerah'
+    | 'tafsir'
+    | 'arabic'
+    | 'akhlaq'
+    | 'general';
+
+export interface ClassBook {
+    id: number;
+    class_id: number;
+    uploaded_by: number;
+    title: string;
+    author?: string;
+    description?: string;
+    session_name: string;
+    available_from?: string;
+    available_until?: string;
+    is_free: boolean;
+    price: number;
+    currency: string;
+    file_path?: string;
+    external_url?: string;
+    is_active: boolean;
+    created_at: string;
+    has_access: boolean;
+    purchase_status?: 'pending' | 'completed' | 'failed' | null;
+    purchase_id?: number | null;
+}
+
+export interface BookPurchase {
+    id: number;
+    book_id: number;
+    user_id: number;
+    amount: number;
+    currency: string;
+    payment_provider: string;
+    transaction_id: string;
+    status: 'pending' | 'completed' | 'failed';
+    purchased_at: string;
+    completed_at?: string;
+}
+
 export interface ClassEnrollment {
     id: number;
     class_id: number;
@@ -155,6 +201,7 @@ export interface IslamiyyaClass {
     created_by: number;
     title: string;
     description?: string;
+    subject: IslamicSubject;
     category: ClassCategory;
     schedule_days?: string;
     start_time?: string;

@@ -39,17 +39,23 @@ const HomePage: React.FC = () => {
                             )}
                         </div>
                         <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">
-                            Welcome to Your Qur&apos;an Learning Sanctuary
+                            Welcome to Your Islamic Learning Sanctuary
                         </h1>
                         <p className="mt-2 max-w-xl text-sm text-emerald-100/85 leading-relaxed">
-                            Perfect your recitation with certified scholars, join structured Islamiyya classes
-                            for children and adults, and participate in live community lectures.
+                            Study Qur&apos;an, Fiqh, Hadith, Aqidah, Seerah, and Arabic in structured Islamiyya classes,
+                            memorize with full Qur&apos;an recitations, and attend live community lectures.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-3">
                         <Link
-                            to="/record"
+                            to="/memorize"
                             className="rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition shadow-sm"
+                        >
+                            📖 Qur&apos;an Hifz Player
+                        </Link>
+                        <Link
+                            to="/record"
+                            className="rounded-xl border border-emerald-500 bg-emerald-800/90 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition shadow-sm"
                         >
                             🎙️ Record Recitation
                         </Link>

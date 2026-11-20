@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
     ClassCategory,
+    IslamicSubject,
     Community,
     CommunityMembership,
     IslamiyyaClass,
@@ -11,6 +12,7 @@ import {
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { IslamicPattern } from '../components/IslamicPattern';
+import ClassBooksPanel from '../components/ClassBooksPanel';
 
 const CATEGORY_LABELS: Record<string, string> = {
     all: 'All Categories',
@@ -19,6 +21,18 @@ const CATEGORY_LABELS: Record<string, string> = {
     adult_women: 'Adult Women',
     youth: 'Youth',
     general: 'General',
+};
+
+const SUBJECT_LABELS: Record<string, string> = {
+    quran_tajweed: "Qur'an & Tajweed",
+    fiqh: 'Fiqh',
+    aqidah: 'Aqidah',
+    hadith: 'Hadith',
+    seerah: 'Seerah',
+    tafsir: 'Tafsir',
+    arabic: 'Arabic',
+    akhlaq: 'Akhlaq',
+    general: 'General Islamic Studies',
 };
 
 const IslamiyyaDetailPage: React.FC = () => {
@@ -41,6 +55,7 @@ const IslamiyyaDetailPage: React.FC = () => {
     const [classForm, setClassForm] = useState({
         title: '',
         description: '',
+        subject: 'quran_tajweed' as IslamicSubject,
         category: 'children' as ClassCategory,
         schedule_days: 'Sat, Sun',
         start_time: '09:00',
@@ -112,6 +127,7 @@ const IslamiyyaDetailPage: React.FC = () => {
             setClassForm({
                 title: '',
                 description: '',
+                subject: 'quran_tajweed',
                 category: 'children',
                 schedule_days: 'Sat, Sun',
                 start_time: '09:00',
@@ -329,6 +345,19 @@ const IslamiyyaDetailPage: React.FC = () => {
                                     className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
                                 />
                                 <select
+                                    value={classForm.subject}
+                                    onChange={(e) =>
+                                        setClassForm({ ...classForm, subject: e.target.value as IslamicSubject })
+                                    }
+                                    className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+                                >
+                                    {Object.entries(SUBJECT_LABELS).map(([k, label]) => (
+                                        <option key={k} value={k}>
+                                            {label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
                                     value={classForm.category}
                                     onChange={(e) =>
                                         setClassForm({ ...classForm, category: e.target.value as ClassCategory })
@@ -397,9 +426,14 @@ const IslamiyyaDetailPage: React.FC = () => {
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <div>
-                                            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-900 border border-emerald-200">
-                                                {CATEGORY_LABELS[cls.category] || cls.category}
-                                            </span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-900 border border-emerald-200">
+                                                    {CATEGORY_LABELS[cls.category] || cls.category}
+                                                </span>
+                                                <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900 border border-amber-200">
+                                                    {SUBJECT_LABELS[cls.subject] || cls.subject}
+                                                </span>
+                                            </div>
                                             <h3 className="mt-2 text-base font-bold text-stone-900">{cls.title}</h3>
                                         </div>
                                         <span className="text-xs text-stone-500">
@@ -436,6 +470,8 @@ const IslamiyyaDetailPage: React.FC = () => {
                                             </button>
                                         )}
                                     </div>
+
+                                    <ClassBooksPanel classId={cls.id} canManage={canManageClasses} />
 
                                     {/* Pending student enrollments for scholar/manager */}
                                     {canManageClasses &&

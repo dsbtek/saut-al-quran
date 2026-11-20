@@ -18,6 +18,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     const navItems = [
         { to: '/', label: 'Home' },
+        { to: '/memorize', label: "Qur'an Hifz" },
         { to: '/communities', label: 'Islamiyyas' },
         { to: '/record', label: 'Record' },
         { to: '/feedback', label: 'My Feedback' },

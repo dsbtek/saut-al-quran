@@ -6,7 +6,7 @@ from app.db.database import get_db
 from app.core.deps import get_current_active_user
 from app.models.user import User, UserRole
 from app.models.community import Community, CommunityMembership
-from app.models.islamiyya_class import IslamiyyaClass, ClassEnrollment, ClassCategory
+from app.models.islamiyya_class import IslamiyyaClass, ClassEnrollment, ClassCategory, IslamicSubject
 from app.schemas.islamiyya_class import (
     IslamiyyaClassCreate,
     IslamiyyaClassUpdate,
@@ -59,6 +59,7 @@ def _serialize_class(db: Session, cls: IslamiyyaClass, current_user: User, inclu
         "created_by": cls.created_by,
         "title": cls.title,
         "description": cls.description,
+        "subject": cls.subject,
         "category": cls.category,
         "schedule_days": cls.schedule_days,
         "start_time": cls.start_time,
@@ -106,6 +107,7 @@ def create_class(
         created_by=current_user.id,
         title=class_in.title,
         description=class_in.description,
+        subject=class_in.subject,
         category=class_in.category,
         schedule_days=class_in.schedule_days,
         start_time=class_in.start_time,
@@ -123,16 +125,19 @@ def create_class(
 def list_community_classes(
     community_id: int,
     category: Optional[ClassCategory] = None,
+    subject: Optional[IslamicSubject] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """List classes for an Islamiyya, optionally filtered by category (children, adult_male, adult_women)."""
+    """List classes for an Islamiyya, optionally filtered by category or Islamic subject."""
     query = db.query(IslamiyyaClass).filter(
         IslamiyyaClass.community_id == community_id,
         IslamiyyaClass.is_active == True,
     )
     if category is not None:
         query = query.filter(IslamiyyaClass.category == category)
+    if subject is not None:
+        query = query.filter(IslamiyyaClass.subject == subject)
 
     classes = query.all()
     can_manage = _can_manage_community_classes(db, community_id, current_user)

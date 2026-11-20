@@ -13,6 +13,18 @@ class ClassCategory(str, enum.Enum):
     GENERAL = "general"
 
 
+class IslamicSubject(str, enum.Enum):
+    QURAN_TAJWEED = "quran_tajweed"
+    FIQH = "fiqh"
+    AQIDAH = "aqidah"
+    HADITH = "hadith"
+    SEERAH = "seerah"
+    TAFSIR = "tafsir"
+    ARABIC = "arabic"
+    AKHLAQ = "akhlaq"
+    GENERAL = "general"
+
+
 class IslamiyyaClass(Base):
     __tablename__ = "islamiyya_classes"
 
@@ -22,6 +34,7 @@ class IslamiyyaClass(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
+    subject = Column(Enum(IslamicSubject), default=IslamicSubject.QURAN_TAJWEED, nullable=False)
     category = Column(Enum(ClassCategory), default=ClassCategory.GENERAL, nullable=False)
     schedule_days = Column(String)  # e.g., "Sat, Sun"
     start_time = Column(String)     # e.g., "09:00"

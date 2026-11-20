@@ -1,12 +1,13 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-from app.models.islamiyya_class import ClassCategory
+from app.models.islamiyya_class import ClassCategory, IslamicSubject
 
 
 class IslamiyyaClassBase(BaseModel):
     title: str
     description: Optional[str] = None
+    subject: IslamicSubject = IslamicSubject.QURAN_TAJWEED
     category: ClassCategory = ClassCategory.GENERAL
     schedule_days: Optional[str] = None
     start_time: Optional[str] = None
@@ -23,6 +24,7 @@ class IslamiyyaClassCreate(IslamiyyaClassBase):
 class IslamiyyaClassUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    subject: Optional[IslamicSubject] = None
     category: Optional[ClassCategory] = None
     schedule_days: Optional[str] = None
     start_time: Optional[str] = None

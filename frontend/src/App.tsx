@@ -13,6 +13,7 @@ import ScholarReviewPage from './pages/ScholarReviewPage';
 import CommunitiesPage from './pages/CommunitiesPage';
 import IslamiyyaDetailPage from './pages/IslamiyyaDetailPage';
 import LectureRoomPage from './pages/LectureRoomPage';
+import QuranMemorizationPage from './pages/QuranMemorizationPage';
 import AdminDashboard from './pages/AdminDashboard';
 import DonationsPage from './pages/DonationsPage';
 import UserFeedbackPage from './pages/UserFeedbackPage';
@@ -92,6 +93,7 @@ const AppContent: React.FC = () => {
             <Layout>
                 <Routes>
                     <Route path="/" element={<HomePage />} />
+                    <Route path="/memorize" element={<QuranMemorizationPage />} />
                     <Route path="/record" element={<RecordingPage />} />
                     <Route path="/feedback" element={<FeedbackPage />} />
                     <Route path="/scholar" element={<ScholarDashboard />} />

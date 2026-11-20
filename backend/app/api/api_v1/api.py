@@ -7,6 +7,7 @@ from app.api.api_v1.endpoints import (
     markers,
     communities,
     classes,
+    books,
     lectures,
     donations,
     feedback,
@@ -20,6 +21,7 @@ api_router.include_router(comments.router, prefix="/comments", tags=["comments"]
 api_router.include_router(markers.router, prefix="/markers", tags=["markers"])
 api_router.include_router(communities.router, prefix="/communities", tags=["communities"])
 api_router.include_router(classes.router, prefix="/classes", tags=["classes"])
+api_router.include_router(books.router, prefix="/books", tags=["books"])
 api_router.include_router(lectures.router, prefix="/lectures", tags=["lectures"])
 api_router.include_router(donations.router, prefix="/donations", tags=["donations"])
 api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"])

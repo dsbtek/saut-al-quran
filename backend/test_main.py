@@ -504,15 +504,81 @@ def test_islamiyya_manager_classes_and_lectures_flow(setup_database, test_user):
     assert view_resp.status_code == 200
     assert view_resp.json()["title"] == "Tafsir of Surah Al-Mulk"
 
+    # Scholar/Manager creates a Fiqh class and uploads free & paid session books
+    fiqh_cls = client.post(
+        "/api/v1/classes/",
+        json={
+            "community_id": comm_id,
+            "title": "Fiqh of Salah",
+            "subject": "fiqh",
+            "category": "general",
+        },
+        headers=mgr_headers,
+    )
+    assert fiqh_cls.status_code == 200
+    fiqh_cls_id = fiqh_cls.json()["id"]
+    assert fiqh_cls.json()["subject"] == "fiqh"
+
+    # Enroll student in Fiqh class and approve
+    f_enr = client.post(f"/api/v1/classes/{fiqh_cls_id}/enroll", headers=user_headers).json()
+    client.post(
+        f"/api/v1/classes/{fiqh_cls_id}/enrollments/{f_enr['id']}/decide",
+        json={"decision": "approve"},
+        headers=mgr_headers,
+    )
+
+    # Upload paid PDF book
+    b_resp = client.post(
+        "/api/v1/books/",
+        data={
+            "class_id": str(fiqh_cls_id),
+            "title": "Fiqh Workbook",
+            "session_name": "2026 Term 1",
+            "is_free": "false",
+            "price": "1500",
+            "currency": "NGN",
+        },
+        files={"file": ("workbook.pdf", b"%PDF-1.4 fake-pdf-bytes", "application/pdf")},
+        headers=mgr_headers,
+    )
+    assert b_resp.status_code == 200
+    book_id = b_resp.json()["id"]
+
+    # Student cannot download paid book before purchase (402)
+    dl_blocked = client.get(f"/api/v1/books/{book_id}/download", headers=user_headers)
+    assert dl_blocked.status_code == 402
+
+    # Student initiates and confirms purchase
+    p_resp = client.post(
+        f"/api/v1/books/{book_id}/purchase",
+        json={"payment_provider": "paystack"},
+        headers=user_headers,
+    )
+    assert p_resp.status_code == 200
+    purchase_id = p_resp.json()["id"]
+    assert p_resp.json()["status"] == "pending"
+
+    conf = client.post(f"/api/v1/books/purchases/{purchase_id}/confirm", headers=user_headers)
+    assert conf.status_code == 200
+    assert conf.json()["status"] == "completed"
+
+    # Student can now download book
+    dl_ok = client.get(f"/api/v1/books/{book_id}/download", headers=user_headers)
+    assert dl_ok.status_code == 200
+    assert dl_ok.content == b"%PDF-1.4 fake-pdf-bytes"
+
     # Cleanup
     db = TestingSessionLocal()
     from app.models.community import Community, CommunityMembership
     from app.models.islamiyya_class import IslamiyyaClass, ClassEnrollment
+    from app.models.class_book import ClassBook, BookPurchase
     from app.models.lecture import PublicLecture, LectureStreamTarget
+    db.query(BookPurchase).filter(BookPurchase.book_id == book_id).delete()
+    db.query(ClassBook).filter(ClassBook.id == book_id).delete()
     db.query(LectureStreamTarget).filter(LectureStreamTarget.lecture_id == lec_id).delete()
     db.query(PublicLecture).filter(PublicLecture.id == lec_id).delete()
-    db.query(ClassEnrollment).filter(ClassEnrollment.class_id == cls_id).delete()
-    db.query(IslamiyyaClass).filter(IslamiyyaClass.id == cls_id).delete()
+    db.query(ClassEnrollment).filter(ClassEnrollment.class_id.in_([cls_id, fiqh_cls_id])).delete(synchronize_session=False)
+    db.query(IslamiyyaClass).filter(IslamiyyaClass.id.in_([cls_id, fiqh_cls_id])).delete(synchronize_session=False)
     db.query(CommunityMembership).filter(CommunityMembership.community_id == comm_id).delete()
     db.query(Community).filter(Community.id == comm_id).delete()
     db.query(User).filter(User.id == mgr_id).delete()
