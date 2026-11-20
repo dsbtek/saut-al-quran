@@ -48,7 +48,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
             source.connect(analyser);
 
             const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
+            const dataArray = new Uint8Array(new ArrayBuffer(bufferLength));
 
             audioContextRef.current = context;
             analyserRef.current = analyser;
@@ -70,7 +70,9 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
-            analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+            analyserRef.current.getByteFrequencyData(
+                dataArrayRef.current as Parameters<AnalyserNode['getByteFrequencyData']>[0],
+            );
 
             // Clear canvas
             ctx.fillStyle = backgroundColor;
