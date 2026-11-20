@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { IslamiyyaClass, PublicLecture, StudentProgressStats } from '../types';
-import { IslamicPattern } from '../components/IslamicPattern';
+import { IslamicPattern, getHijriDateString } from '../components/IslamicPattern';
+import { QuranicVerseBanner, WelcomePillars } from '../components/WelcomeShowcase';
 
 const HomePage: React.FC = () => {
     const { user } = useAuth();
@@ -13,6 +14,8 @@ const HomePage: React.FC = () => {
 
     const isScholarOrManager =
         user?.role === 'scholar' || user?.role === 'islamiyya_manager' || user?.role === 'admin';
+    const isAdmin = user?.role === 'admin';
+    const hijriDate = getHijriDateString();
 
     useEffect(() => {
         apiService.getMyProgressStats().then(setStats).catch(() => setStats(null));
@@ -21,21 +24,26 @@ const HomePage: React.FC = () => {
     }, []);
 
     return (
-        <div className="space-y-6">
-            {/* Islamic Editorial Hero Banner */}
+        <div className="space-y-7">
+            {/* Islamic Editorial Welcome Hero */}
             <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-6 sm:p-8 text-white shadow-sm border border-emerald-800/40">
                 <IslamicPattern className="absolute inset-0 text-amber-200" />
                 <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">
-                            Assalamu Alaikum, {user?.full_name || user?.username}
-                        </p>
-                        <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight">
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-300">
+                            <span>Assalamu Alaikum, {user?.full_name || user?.username}</span>
+                            {hijriDate && (
+                                <span className="rounded-full bg-emerald-900/90 px-2.5 py-0.5 text-[11px] font-medium text-emerald-100 border border-emerald-700/60">
+                                    {hijriDate}
+                                </span>
+                            )}
+                        </div>
+                        <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">
                             Welcome to Your Qur&apos;an Learning Sanctuary
                         </h1>
-                        <p className="mt-2 max-w-xl text-sm text-emerald-100/85">
-                            Join an Islamiyya, attend live community lectures, enroll in Tajweed classes,
-                            and receive timestamped scholar guidance on your recitation.
+                        <p className="mt-2 max-w-xl text-sm text-emerald-100/85 leading-relaxed">
+                            Perfect your recitation with certified scholars, join structured Islamiyya classes
+                            for children and adults, and participate in live community lectures.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -59,9 +67,20 @@ const HomePage: React.FC = () => {
                                 👨‍🏫 Scholar Queue
                             </Link>
                         )}
+                        {isAdmin && (
+                            <Link
+                                to="/admin"
+                                className="rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:bg-white/20 transition"
+                            >
+                                ⚙️ Admin Console
+                            </Link>
+                        )}
                     </div>
                 </div>
             </section>
+
+            {/* Qur'anic Verse Spotlight */}
+            <QuranicVerseBanner />
 
             {/* Live & Upcoming Public Lectures */}
             {liveLectures.length > 0 && (
@@ -189,6 +208,14 @@ const HomePage: React.FC = () => {
                     </div>
                 </section>
             )}
+
+            {/* Welcome Learning Pillars */}
+            <section className="space-y-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">
+                    How Saut Al-Qur&apos;an Works
+                </h2>
+                <WelcomePillars />
+            </section>
 
             {/* Quick Navigation Cards */}
             <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
