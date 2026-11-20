@@ -22,18 +22,25 @@ class CommunityUpdate(BaseModel):
 class CommunityMembershipBase(BaseModel):
     role: str = "member"
 
+
 class CommunityMembershipCreate(CommunityMembershipBase):
     user_id: int
     community_id: int
 
+
 class CommunityMembershipUpdate(BaseModel):
     role: Optional[str] = None
+    status: Optional[str] = None
     is_active: Optional[bool] = None
+
 
 class CommunityMembership(CommunityMembershipBase):
     id: int
     community_id: int
     user_id: int
+    requested_role: Optional[str] = "member"
+    status: str = "pending"
+    request_message: Optional[str] = None
     is_active: bool
     joined_at: datetime
     left_at: Optional[datetime] = None
@@ -82,7 +89,13 @@ class CommunityInvitation(CommunityInvitationBase):
 
 class CommunityJoinRequest(BaseModel):
     community_id: int
+    requested_role: str = "member"  # member (student) or scholar
     message: Optional[str] = None
+
+
+class MembershipDecisionRequest(BaseModel):
+    decision: str  # "approve" or "reject"
+    assigned_role: Optional[str] = None  # optional override: "member", "scholar", "admin"
 
 class CommunityStats(BaseModel):
     total_members: int

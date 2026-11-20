@@ -387,3 +387,134 @@ def test_anonymous_donation_and_feedback(setup_database):
     )
     assert f_resp.status_code == 200
     assert f_resp.json()["title"] == "Dark mode"
+
+
+def test_islamiyya_manager_classes_and_lectures_flow(setup_database, test_user):
+    db = TestingSessionLocal()
+    manager = User(
+        email="mgr_test@example.com",
+        username="mgrtest",
+        full_name="Manager Test",
+        hashed_password=get_password_hash("mgrpass"),
+        role=UserRole.ISLAM_MANAGER,
+        is_active=True,
+        is_verified=True,
+    )
+    db.add(manager)
+    db.commit()
+    db.refresh(manager)
+    mgr_id = manager.id
+    db.close()
+
+    mgr_headers = get_auth_headers("mgrtest", "mgrpass")
+    user_headers = get_auth_headers("testuser", "testpassword")
+
+    # Manager creates an Islamiyya
+    c_resp = client.post(
+        "/api/v1/communities/",
+        json={"name": "Al-Noor Academy", "location": "Abuja"},
+        headers=mgr_headers,
+    )
+    assert c_resp.status_code == 200
+    comm_id = c_resp.json()["id"]
+
+    # Student requests to join Islamiyya
+    j_resp = client.post(
+        f"/api/v1/communities/{comm_id}/join",
+        json={"community_id": comm_id, "requested_role": "member", "message": "Assalamu Alaikum"},
+        headers=user_headers,
+    )
+    assert j_resp.status_code == 200
+    assert j_resp.json()["status"] == "pending"
+
+    # Manager lists pending requests and approves student
+    reqs = client.get(f"/api/v1/communities/{comm_id}/requests", headers=mgr_headers).json()
+    assert len(reqs) == 1
+    req_id = reqs[0]["id"]
+
+    dec = client.post(
+        f"/api/v1/communities/{comm_id}/requests/{req_id}/decide",
+        json={"decision": "approve"},
+        headers=mgr_headers,
+    )
+    assert dec.status_code == 200
+    assert dec.json()["status"] == "approved"
+
+    # Manager creates categorized classes
+    cls_resp = client.post(
+        "/api/v1/classes/",
+        json={
+            "community_id": comm_id,
+            "title": "Kids Tajweed",
+            "category": "children",
+            "schedule_days": "Sat, Sun",
+            "start_time": "09:00",
+            "end_time": "10:00",
+        },
+        headers=mgr_headers,
+    )
+    assert cls_resp.status_code == 200
+    cls_id = cls_resp.json()["id"]
+    assert cls_resp.json()["category"] == "children"
+
+    # Student enrolls and Manager approves
+    enr_resp = client.post(f"/api/v1/classes/{cls_id}/enroll", headers=user_headers)
+    assert enr_resp.status_code == 200
+    enr_id = enr_resp.json()["id"]
+
+    enr_dec = client.post(
+        f"/api/v1/classes/{cls_id}/enrollments/{enr_id}/decide",
+        json={"decision": "approve"},
+        headers=mgr_headers,
+    )
+    assert enr_dec.status_code == 200
+    assert enr_dec.json()["status"] == "approved"
+
+    # Manager schedules a Public Lecture with Facebook & YouTube stream targets
+    lec_resp = client.post(
+        "/api/v1/lectures/",
+        json={
+            "community_id": comm_id,
+            "title": "Tafsir of Surah Al-Mulk",
+            "speaker_name": "Ustadh Manager",
+            "scheduled_at": "2026-12-01T18:00:00Z",
+            "stream_embed_url": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+            "is_public": True,
+            "stream_targets": [
+                {"platform": "facebook", "watch_url": "https://facebook.com/live/123"},
+                {"platform": "youtube", "watch_url": "https://youtube.com/live/123"},
+            ],
+        },
+        headers=mgr_headers,
+    )
+    assert lec_resp.status_code == 200
+    lec_id = lec_resp.json()["id"]
+    assert len(lec_resp.json()["stream_targets"]) == 2
+
+    # Transition to live and verify student can view
+    live_resp = client.put(
+        f"/api/v1/lectures/{lec_id}/status",
+        json={"status": "live"},
+        headers=mgr_headers,
+    )
+    assert live_resp.status_code == 200
+    assert live_resp.json()["status"] == "live"
+
+    view_resp = client.get(f"/api/v1/lectures/{lec_id}", headers=user_headers)
+    assert view_resp.status_code == 200
+    assert view_resp.json()["title"] == "Tafsir of Surah Al-Mulk"
+
+    # Cleanup
+    db = TestingSessionLocal()
+    from app.models.community import Community, CommunityMembership
+    from app.models.islamiyya_class import IslamiyyaClass, ClassEnrollment
+    from app.models.lecture import PublicLecture, LectureStreamTarget
+    db.query(LectureStreamTarget).filter(LectureStreamTarget.lecture_id == lec_id).delete()
+    db.query(PublicLecture).filter(PublicLecture.id == lec_id).delete()
+    db.query(ClassEnrollment).filter(ClassEnrollment.class_id == cls_id).delete()
+    db.query(IslamiyyaClass).filter(IslamiyyaClass.id == cls_id).delete()
+    db.query(CommunityMembership).filter(CommunityMembership.community_id == comm_id).delete()
+    db.query(Community).filter(Community.id == comm_id).delete()
+    db.query(User).filter(User.id == mgr_id).delete()
+    db.commit()
+    db.close()

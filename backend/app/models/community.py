@@ -19,7 +19,14 @@ class Community(Base):
     # Relationships
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_communities")
     memberships = relationship("CommunityMembership", back_populates="community", cascade="all, delete-orphan")
-    members = relationship("User", secondary="community_memberships", back_populates="communities", viewonly=True)
+    members = relationship(
+        "User",
+        secondary="community_memberships",
+        primaryjoin="Community.id==CommunityMembership.community_id",
+        secondaryjoin="User.id==CommunityMembership.user_id",
+        back_populates="communities",
+        viewonly=True,
+    )
     model_config = {"from_attributes": True}
 class CommunityMembership(Base):
     __tablename__ = "community_memberships"
@@ -27,14 +34,20 @@ class CommunityMembership(Base):
     id = Column(Integer, primary_key=True, index=True)
     community_id = Column(Integer, ForeignKey("communities.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role = Column(String, default="member")  # member, scholar, admin
+    role = Column(String, default="member")  # member (student), scholar, admin
+    requested_role = Column(String, default="member")  # member, scholar
+    status = Column(String, default="pending")  # pending, approved, rejected
+    request_message = Column(Text)
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True)
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     left_at = Column(DateTime(timezone=True))
 
     # Relationships
     community = relationship("Community", back_populates="memberships")
-    user = relationship("User", back_populates="community_memberships")
+    user = relationship("User", foreign_keys=[user_id], back_populates="community_memberships")
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
     model_config = {"from_attributes": True}
 class CommunityInvitation(Base):
     __tablename__ = "community_invitations"

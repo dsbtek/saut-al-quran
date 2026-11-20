@@ -3,7 +3,7 @@ export interface User {
     email: string;
     username: string;
     full_name?: string;
-    role: 'user' | 'scholar' | 'admin';
+    role: 'user' | 'scholar' | 'islamiyya_manager' | 'admin';
     is_active: boolean;
     is_verified: boolean;
     created_at: string;
@@ -103,6 +103,19 @@ export interface RegisterData {
     full_name?: string;
 }
 
+export interface CommunityMembership {
+    id: number;
+    community_id: number;
+    user_id: number;
+    role: string;
+    requested_role?: string;
+    status: 'pending' | 'approved' | 'rejected';
+    request_message?: string;
+    is_active: boolean;
+    joined_at: string;
+    user?: User;
+}
+
 export interface Community {
     id: number;
     name: string;
@@ -117,6 +130,75 @@ export interface Community {
     member_count?: number;
     scholar_count?: number;
     members?: User[];
+    memberships?: CommunityMembership[];
+}
+
+export type ClassCategory = 'children' | 'adult_male' | 'adult_women' | 'youth' | 'general';
+
+export interface ClassEnrollment {
+    id: number;
+    class_id: number;
+    student_id: number;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+    student?: {
+        id: number;
+        username: string;
+        full_name?: string;
+    };
+}
+
+export interface IslamiyyaClass {
+    id: number;
+    community_id: number;
+    scholar_id?: number;
+    created_by: number;
+    title: string;
+    description?: string;
+    category: ClassCategory;
+    schedule_days?: string;
+    start_time?: string;
+    end_time?: string;
+    surah_focus?: string;
+    max_students?: number;
+    is_active: boolean;
+    created_at: string;
+    scholar?: {
+        id: number;
+        username: string;
+        full_name?: string;
+    };
+    enrolled_count: number;
+    pending_count: number;
+    my_enrollment_status?: 'pending' | 'approved' | 'rejected' | null;
+    enrollments?: ClassEnrollment[] | null;
+}
+
+export interface LectureStreamTarget {
+    id?: number;
+    lecture_id?: number;
+    platform: 'facebook' | 'youtube' | 'instagram' | 'x' | 'custom_rtmp' | string;
+    watch_url?: string;
+    rtmp_url?: string;
+    is_active?: boolean;
+}
+
+export interface PublicLecture {
+    id: number;
+    community_id: number;
+    host_id: number;
+    title: string;
+    speaker_name: string;
+    description?: string;
+    topic?: string;
+    scheduled_at: string;
+    status: 'scheduled' | 'live' | 'ended';
+    stream_embed_url?: string;
+    recording_url?: string;
+    is_public: boolean;
+    created_at: string;
+    community_name?: string;
+    stream_targets: LectureStreamTarget[];
 }
 
 export interface CommunityCreate {

@@ -9,6 +9,9 @@ import FeedbackPage from './pages/FeedbackPage';
 import ScholarDashboard from './pages/ScholarDashboard';
 import ScholarReviewPage from './pages/ScholarReviewPage';
 import CommunitiesPage from './pages/CommunitiesPage';
+import IslamiyyaDetailPage from './pages/IslamiyyaDetailPage';
+import LectureRoomPage from './pages/LectureRoomPage';
+import AdminDashboard from './pages/AdminDashboard';
 import DonationsPage from './pages/DonationsPage';
 import UserFeedbackPage from './pages/UserFeedbackPage';
 
@@ -54,6 +57,9 @@ const AppContent: React.FC = () => {
                     <Route path="/scholar" element={<ScholarDashboard />} />
                     <Route path="/scholar/review/:recitationId" element={<ScholarReviewPage />} />
                     <Route path="/communities" element={<CommunitiesPage />} />
+                    <Route path="/communities/:communityId" element={<IslamiyyaDetailPage />} />
+                    <Route path="/lectures/:lectureId" element={<LectureRoomPage />} />
+                    <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/donations" element={<DonationsPage />} />
                     <Route path="/user-feedback" element={<UserFeedbackPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />

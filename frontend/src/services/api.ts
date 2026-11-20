@@ -11,6 +11,12 @@ import {
     StudentProgressStats,
     Community,
     CommunityCreate,
+    CommunityMembership,
+    IslamiyyaClass,
+    ClassCategory,
+    ClassEnrollment,
+    PublicLecture,
+    LectureStreamTarget,
     Donation,
     DonationCreate,
     DonationStats,
@@ -320,7 +326,7 @@ class ApiService {
         await this.request(`/markers/loops/${loopId}`, { method: 'DELETE' });
     }
 
-    // Communities
+    // Communities & Approvals
     async getCommunities(search?: string): Promise<Community[]> {
         const qs = search ? `?search=${encodeURIComponent(search)}` : '';
         return this.request<Community[]>(`/communities/${qs}`);
@@ -330,6 +336,14 @@ class ApiService {
         return this.request<Community[]>('/communities/my-communities');
     }
 
+    async getMyJoinRequests(): Promise<CommunityMembership[]> {
+        return this.request<CommunityMembership[]>('/communities/my-requests');
+    }
+
+    async getCommunity(id: number): Promise<Community> {
+        return this.request<Community>(`/communities/${id}`);
+    }
+
     async createCommunity(data: CommunityCreate): Promise<Community> {
         return this.request<Community>('/communities/', {
             method: 'POST',
@@ -337,16 +351,144 @@ class ApiService {
         });
     }
 
-    async joinCommunity(communityId: number, message?: string): Promise<{ message: string }> {
-        return this.request<{ message: string }>(`/communities/${communityId}/join`, {
+    async joinCommunity(
+        communityId: number,
+        requestedRole: 'member' | 'scholar' = 'member',
+        message?: string,
+    ): Promise<{ message: string; status: string }> {
+        return this.request<{ message: string; status: string }>(`/communities/${communityId}/join`, {
             method: 'POST',
-            body: JSON.stringify({ community_id: communityId, message }),
+            body: JSON.stringify({
+                community_id: communityId,
+                requested_role: requestedRole,
+                message,
+            }),
         });
+    }
+
+    async getCommunityRequests(communityId: number): Promise<CommunityMembership[]> {
+        return this.request<CommunityMembership[]>(`/communities/${communityId}/requests`);
+    }
+
+    async decideCommunityRequest(
+        communityId: number,
+        membershipId: number,
+        decision: 'approve' | 'reject',
+    ): Promise<CommunityMembership> {
+        return this.request<CommunityMembership>(
+            `/communities/${communityId}/requests/${membershipId}/decide`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ decision }),
+            },
+        );
     }
 
     async leaveCommunity(communityId: number): Promise<{ message: string }> {
         return this.request<{ message: string }>(`/communities/${communityId}/leave`, {
             method: 'DELETE',
+        });
+    }
+
+    // Islamiyya Classes
+    async getCommunityClasses(communityId: number, category?: ClassCategory): Promise<IslamiyyaClass[]> {
+        const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+        return this.request<IslamiyyaClass[]>(`/classes/community/${communityId}${qs}`);
+    }
+
+    async getMyClasses(): Promise<IslamiyyaClass[]> {
+        return this.request<IslamiyyaClass[]>('/classes/my-classes');
+    }
+
+    async createClass(data: {
+        community_id: number;
+        title: string;
+        description?: string;
+        category: ClassCategory;
+        schedule_days?: string;
+        start_time?: string;
+        end_time?: string;
+        surah_focus?: string;
+    }): Promise<IslamiyyaClass> {
+        return this.request<IslamiyyaClass>('/classes/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async requestClassEnrollment(classId: number): Promise<ClassEnrollment> {
+        return this.request<ClassEnrollment>(`/classes/${classId}/enroll`, {
+            method: 'POST',
+        });
+    }
+
+    async decideClassEnrollment(
+        classId: number,
+        enrollmentId: number,
+        decision: 'approve' | 'reject',
+    ): Promise<ClassEnrollment> {
+        return this.request<ClassEnrollment>(
+            `/classes/${classId}/enrollments/${enrollmentId}/decide`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ decision }),
+            },
+        );
+    }
+
+    // Public Lectures & Social Streaming
+    async getLiveLectures(): Promise<PublicLecture[]> {
+        return this.request<PublicLecture[]>('/lectures/live');
+    }
+
+    async getCommunityLectures(communityId: number): Promise<PublicLecture[]> {
+        return this.request<PublicLecture[]>(`/lectures/community/${communityId}`);
+    }
+
+    async getLecture(lectureId: number): Promise<PublicLecture> {
+        return this.request<PublicLecture>(`/lectures/${lectureId}`);
+    }
+
+    async createLecture(data: {
+        community_id: number;
+        title: string;
+        speaker_name: string;
+        description?: string;
+        topic?: string;
+        scheduled_at: string;
+        stream_embed_url?: string;
+        is_public?: boolean;
+        stream_targets: LectureStreamTarget[];
+    }): Promise<PublicLecture> {
+        return this.request<PublicLecture>('/lectures/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async updateLectureStatus(
+        lectureId: number,
+        status: 'scheduled' | 'live' | 'ended',
+        stream_embed_url?: string,
+    ): Promise<PublicLecture> {
+        return this.request<PublicLecture>(`/lectures/${lectureId}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({ status, stream_embed_url }),
+        });
+    }
+
+    // Admin Users Management
+    async getAllUsers(): Promise<User[]> {
+        return this.request<User[]>('/users/');
+    }
+
+    async updateUser(
+        userId: number,
+        data: { role?: User['role']; is_active?: boolean },
+    ): Promise<User> {
+        return this.request<User>(`/users/${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
         });
     }
 

@@ -8,6 +8,7 @@ import enum
 class UserRole(str, enum.Enum):
     USER = "user"
     SCHOLAR = "scholar"
+    ISLAM_MANAGER = "islamiyya_manager"
     ADMIN = "admin"
 
 
@@ -34,8 +35,17 @@ class User(Base):
     created_communities = relationship(
         "Community", foreign_keys="Community.created_by", back_populates="creator")
     community_memberships = relationship(
-        "CommunityMembership", back_populates="user")
+        "CommunityMembership",
+        foreign_keys="CommunityMembership.user_id",
+        back_populates="user",
+    )
     communities = relationship(
-        "Community", secondary="community_memberships", back_populates="members", viewonly=True)
+        "Community",
+        secondary="community_memberships",
+        primaryjoin="User.id==CommunityMembership.user_id",
+        secondaryjoin="Community.id==CommunityMembership.community_id",
+        back_populates="members",
+        viewonly=True,
+    )
     donations = relationship("Donation", back_populates="user")
     model_config = {"from_attributes": True}
