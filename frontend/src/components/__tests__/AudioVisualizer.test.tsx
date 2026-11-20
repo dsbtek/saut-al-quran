@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
@@ -55,15 +54,15 @@ Object.defineProperty(window, 'webkitAudioContext', {
     value: vi.fn(() => mockAudioContext),
 });
 
-global.requestAnimationFrame = vi.fn((cb) => {
-    setTimeout(cb, 16);
+global.requestAnimationFrame = vi.fn((cb: FrameRequestCallback) => {
+    setTimeout(() => cb(0), 16);
     return 1;
-});
+}) as unknown as typeof requestAnimationFrame;
 
 global.cancelAnimationFrame = vi.fn();
 
 // Mock HTMLCanvasElement
-HTMLCanvasElement.prototype.getContext = mockCanvas.getContext;
+HTMLCanvasElement.prototype.getContext = mockCanvas.getContext as unknown as typeof HTMLCanvasElement.prototype.getContext;
 
 describe('AudioVisualizer', () => {
     const mockStream = {

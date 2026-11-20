@@ -1,346 +1,204 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Donation, DonationCreate } from '../types';
-import { useAuth } from '../contexts/AuthContext';
-import DonationForm from '../components/DonationForm';
+import React, { useEffect, useState } from 'react';
+import { Donation, DonationCreate, DonationStats } from '../types';
+import { apiService } from '../services/api';
 
 const DonationsPage: React.FC = () => {
-    const { user } = useAuth();
-    const [showDonationForm, setShowDonationForm] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [recentDonations, setRecentDonations] = useState<Donation[]>([]);
-    const [donationStats, setDonationStats] = useState({
-        total_donations: 0,
-        total_donors: 0,
-        monthly_donations: 0,
-        recent_donations: 0,
+    const [stats, setStats] = useState<DonationStats | null>(null);
+    const [publicDonations, setPublicDonations] = useState<Donation[]>([]);
+    const [form, setForm] = useState<DonationCreate>({
+        amount: 5000,
+        currency: 'NGN',
+        donation_type: 'one_time',
+        payment_provider: 'paystack',
+        donor_name: '',
+        donor_email: '',
+        message: '',
+        is_anonymous: false,
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [resultMsg, setResultMsg] = useState('');
+    const [error, setError] = useState('');
 
-    // Mock data for demonstration
     useEffect(() => {
-        const mockDonations: Donation[] = [
-            {
-                id: 1,
-                amount: 5000,
-                currency: 'NGN',
-                donation_type: 'one_time',
-                status: 'completed',
-                payment_provider: 'paystack',
-                transaction_id: 'SAQ_123456',
-                donor_name: 'Ahmad Ibrahim',
-                message: 'May Allah bless this project',
-                is_anonymous: false,
-                created_at: '2024-06-20T10:00:00Z',
-                completed_at: '2024-06-20T10:05:00Z',
-            },
-            {
-                id: 2,
-                amount: 2500,
-                currency: 'NGN',
-                donation_type: 'one_time',
-                status: 'completed',
-                payment_provider: 'paystack',
-                transaction_id: 'SAQ_789012',
-                donor_name: 'Anonymous',
-                message: 'Keep up the good work!',
-                is_anonymous: true,
-                created_at: '2024-06-19T15:30:00Z',
-                completed_at: '2024-06-19T15:35:00Z',
-            },
-            {
-                id: 3,
-                amount: 10000,
-                currency: 'NGN',
-                donation_type: 'one_time',
-                status: 'completed',
-                payment_provider: 'paystack',
-                transaction_id: 'SAQ_345678',
-                donor_name: 'Fatima Abdullahi',
-                message: 'For the sake of Allah',
-                is_anonymous: false,
-                created_at: '2024-06-18T09:15:00Z',
-                completed_at: '2024-06-18T09:20:00Z',
-            },
-        ];
-
-        setRecentDonations(mockDonations);
-        setDonationStats({
-            total_donations: 125000,
-            total_donors: 45,
-            monthly_donations: 35000,
-            recent_donations: 12,
-        });
+        Promise.all([apiService.getDonationStats(), apiService.getPublicDonations()])
+            .then(([s, d]) => {
+                setStats(s);
+                setPublicDonations(d);
+            })
+            .catch(() => { });
     }, []);
 
-    const handleDonation = async (donationData: DonationCreate) => {
-        setIsLoading(true);
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        setError('');
+        setResultMsg('');
         try {
-            // Mock API call
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // In a real app, this would redirect to payment gateway
-            alert('Redirecting to payment gateway...\n\nThis is a demo - payment integration would be implemented with Paystack/Stripe.');
-            setShowDonationForm(false);
-        } catch (error) {
-            console.error('Error processing donation:', error);
-            alert('Error processing donation. Please try again.');
+            const res = await apiService.initiateDonation({
+                ...form,
+                donor_email: form.donor_email?.trim() || undefined,
+            });
+            setResultMsg(
+                `Donation initiated! Reference: ${res.reference}. Transaction ID: ${res.transaction_id}`,
+            );
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to initiate donation');
         } finally {
-            setIsLoading(false);
+            setIsSubmitting(false);
         }
     };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-NG', {
-            style: 'currency',
-            currency: 'NGN',
-        }).format(amount);
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
-
-    if (showDonationForm) {
-        return (
-            <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-                <DonationForm
-                    onSubmit={handleDonation}
-                    onCancel={() => setShowDonationForm(false)}
-                    isLoading={isLoading}
-                />
-            </div>
-        );
-    }
-
     return (
-        <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '20px' }}>
-                <Link 
-                    to="/" 
-                    style={{
-                        display: 'inline-block',
-                        padding: '8px 16px',
-                        backgroundColor: '#f8f9fa',
-                        color: '#007bff',
-                        textDecoration: 'none',
-                        borderRadius: '4px',
-                        border: '1px solid #007bff',
-                    }}
-                >
-                    ← Back to Home
-                </Link>
-            </div>
-
-            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                <h1 style={{ color: '#333', marginBottom: '8px' }}>
-                    💝 Support Saut Al-Qur'an
-                </h1>
-                <p style={{ color: '#666', fontSize: '18px', maxWidth: '600px', margin: '0 auto' }}>
-                    Help us maintain and improve this platform for the Muslim community worldwide. 
-                    Your donations support development, hosting, and new features.
-                </p>
-            </div>
-
-            {/* Donation Stats */}
-            <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '20px',
-                    marginBottom: '40px',
-                }}
-            >
-                <div
-                    style={{
-                        padding: '24px',
-                        backgroundColor: '#e7f3ff',
-                        borderRadius: '12px',
-                        textAlign: 'center',
-                    }}
-                >
-                    <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#007bff' }}>
-                        {formatCurrency(donationStats.total_donations)}
-                    </div>
-                    <div style={{ color: '#666', marginTop: '8px' }}>Total Raised</div>
-                </div>
-                <div
-                    style={{
-                        padding: '24px',
-                        backgroundColor: '#e8f5e8',
-                        borderRadius: '12px',
-                        textAlign: 'center',
-                    }}
-                >
-                    <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#28a745' }}>
-                        {donationStats.total_donors}
-                    </div>
-                    <div style={{ color: '#666', marginTop: '8px' }}>Generous Donors</div>
-                </div>
-                <div
-                    style={{
-                        padding: '24px',
-                        backgroundColor: '#fff3cd',
-                        borderRadius: '12px',
-                        textAlign: 'center',
-                    }}
-                >
-                    <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#ffc107' }}>
-                        {formatCurrency(donationStats.monthly_donations)}
-                    </div>
-                    <div style={{ color: '#666', marginTop: '8px' }}>This Month</div>
-                </div>
-                <div
-                    style={{
-                        padding: '24px',
-                        backgroundColor: '#f8d7da',
-                        borderRadius: '12px',
-                        textAlign: 'center',
-                    }}
-                >
-                    <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#dc3545' }}>
-                        {donationStats.recent_donations}
-                    </div>
-                    <div style={{ color: '#666', marginTop: '8px' }}>Recent Donations</div>
-                </div>
-            </div>
-
-            {/* Donate Button */}
-            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                <button
-                    onClick={() => setShowDonationForm(true)}
-                    style={{
-                        padding: '16px 32px',
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 8px rgba(40, 167, 69, 0.3)',
-                    }}
-                >
-                    💝 Make a Donation
-                </button>
-            </div>
-
-            {/* How Donations Help */}
-            <div
-                style={{
-                    backgroundColor: '#f8f9fa',
-                    padding: '32px',
-                    borderRadius: '12px',
-                    marginBottom: '40px',
-                }}
-            >
-                <h2 style={{ textAlign: 'center', marginBottom: '24px', color: '#333' }}>
-                    🎯 How Your Donations Help
-                </h2>
-                <div
-                    style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                        gap: '24px',
-                    }}
-                >
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>🖥️</div>
-                        <h3 style={{ color: '#333', marginBottom: '8px' }}>Server & Hosting</h3>
-                        <p style={{ color: '#666', fontSize: '14px' }}>
-                            Keep the app running 24/7 with reliable hosting and fast servers
-                        </p>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚡</div>
-                        <h3 style={{ color: '#333', marginBottom: '8px' }}>New Features</h3>
-                        <p style={{ color: '#666', fontSize: '14px' }}>
-                            Develop new features like advanced audio analysis and AI feedback
-                        </p>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>🛠️</div>
-                        <h3 style={{ color: '#333', marginBottom: '8px' }}>Maintenance</h3>
-                        <p style={{ color: '#666', fontSize: '14px' }}>
-                            Regular updates, bug fixes, and security improvements
-                        </p>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>🌍</div>
-                        <h3 style={{ color: '#333', marginBottom: '8px' }}>Global Access</h3>
-                        <p style={{ color: '#666', fontSize: '14px' }}>
-                            Make the app accessible to Muslims worldwide, regardless of location
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Recent Donations */}
+        <div className="mx-auto max-w-4xl space-y-6">
             <div>
-                <h2 style={{ marginBottom: '24px', color: '#333' }}>
-                    🙏 Recent Donations
-                </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {recentDonations.map((donation) => (
-                        <div
-                            key={donation.id}
-                            style={{
-                                padding: '20px',
-                                backgroundColor: '#fff',
-                                border: '1px solid #ddd',
-                                borderRadius: '8px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                            }}
-                        >
-                            <div>
-                                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                                    {donation.is_anonymous ? 'Anonymous Donor' : donation.donor_name}
-                                </div>
-                                {donation.message && (
-                                    <div style={{ color: '#666', fontSize: '14px', fontStyle: 'italic' }}>
-                                        "{donation.message}"
-                                    </div>
-                                )}
-                                <div style={{ color: '#999', fontSize: '12px', marginTop: '4px' }}>
-                                    {formatDate(donation.created_at)}
-                                </div>
-                            </div>
-                            <div
-                                style={{
-                                    fontSize: '18px',
-                                    fontWeight: 'bold',
-                                    color: '#28a745',
-                                }}
-                            >
-                                {formatCurrency(donation.amount)}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                <h1 className="text-2xl font-bold text-stone-900">Support Saut Al-Qur&apos;an</h1>
+                <p className="text-sm text-stone-600">
+                    Your Sadaqah helps keep scholar reviews free and accessible for students worldwide.
+                </p>
             </div>
 
-            {/* Footer Message */}
-            <div
-                style={{
-                    marginTop: '40px',
-                    padding: '24px',
-                    backgroundColor: '#e7f3ff',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                }}
-            >
-                <h3 style={{ color: '#007bff', marginBottom: '12px' }}>
-                    جَزَاكَ اللَّهُ خَيْرًا
-                </h3>
-                <p style={{ color: '#666', fontSize: '16px' }}>
-                    May Allah reward you with goodness for your support. Every donation, 
-                    no matter the size, helps us serve the Muslim community better.
-                </p>
+            {stats && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="rounded-xl border border-stone-200 bg-white p-4">
+                        <div className="text-xs text-stone-500">Total Raised</div>
+                        <div className="mt-1 text-xl font-bold text-emerald-900">
+                            ₦{Number(stats.total_donations).toLocaleString()}
+                        </div>
+                    </div>
+                    <div className="rounded-xl border border-stone-200 bg-white p-4">
+                        <div className="text-xs text-stone-500">Total Donors</div>
+                        <div className="mt-1 text-xl font-bold text-stone-900">{stats.total_donors}</div>
+                    </div>
+                    <div className="rounded-xl border border-stone-200 bg-white p-4">
+                        <div className="text-xs text-stone-500">This Month</div>
+                        <div className="mt-1 text-xl font-bold text-stone-900">
+                            ₦{Number(stats.monthly_donations).toLocaleString()}
+                        </div>
+                    </div>
+                    <div className="rounded-xl border border-stone-200 bg-white p-4">
+                        <div className="text-xs text-stone-500">Last 30 Days</div>
+                        <div className="mt-1 text-xl font-bold text-stone-900">
+                            {stats.recent_donations} gifts
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <form
+                    onSubmit={handleSubmit}
+                    className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4"
+                >
+                    <h2 className="text-lg font-bold text-stone-900">Make a Contribution</h2>
+
+                    {resultMsg && (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                            {resultMsg}
+                        </div>
+                    )}
+                    {error && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold text-stone-600">Amount</label>
+                            <input
+                                type="number"
+                                min="100"
+                                required
+                                value={form.amount}
+                                onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })}
+                                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold text-stone-600">Provider</label>
+                            <select
+                                value={form.payment_provider}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        payment_provider: e.target.value as DonationCreate['payment_provider'],
+                                    })
+                                }
+                                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+                            >
+                                <option value="paystack">Paystack</option>
+                                <option value="stripe">Stripe</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <input
+                            type="text"
+                            placeholder="Your name (optional)"
+                            value={form.donor_name || ''}
+                            onChange={(e) => setForm({ ...form, donor_name: e.target.value })}
+                            className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                        />
+                        <input
+                            type="email"
+                            placeholder="Email (optional)"
+                            value={form.donor_email || ''}
+                            onChange={(e) => setForm({ ...form, donor_email: e.target.value })}
+                            className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                        />
+                    </div>
+
+                    <textarea
+                        rows={2}
+                        placeholder="Optional du'a or message..."
+                        value={form.message || ''}
+                        onChange={(e) => setForm({ ...form, message: e.target.value })}
+                        className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                    />
+
+                    <label className="flex items-center gap-2 text-sm text-stone-700">
+                        <input
+                            type="checkbox"
+                            checked={form.is_anonymous}
+                            onChange={(e) => setForm({ ...form, is_anonymous: e.target.checked })}
+                            className="rounded border-stone-300 text-emerald-800"
+                        />
+                        Donate anonymously
+                    </label>
+
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full rounded-xl bg-emerald-800 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-50"
+                    >
+                        {isSubmitting ? 'Processing...' : '💝 Initiate Donation'}
+                    </button>
+                </form>
+
+                <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+                    <h2 className="mb-4 text-lg font-bold text-stone-900">Recent Supporters</h2>
+                    {publicDonations.length === 0 ? (
+                        <p className="text-sm text-stone-500">Be the first to support this mission.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {publicDonations.map((d) => (
+                                <div key={d.id} className="rounded-xl border border-stone-100 bg-stone-50 p-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-semibold text-stone-900">
+                                            {d.donor_name || 'Supporter'}
+                                        </span>
+                                        <span className="text-sm font-bold text-emerald-800">
+                                            {d.currency} {Number(d.amount).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    {d.message && <p className="mt-1 text-xs text-stone-600">{d.message}</p>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

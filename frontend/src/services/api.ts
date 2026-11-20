@@ -3,27 +3,30 @@ import {
     Recitation,
     Comment,
     Marker,
+    LoopRegion,
     AuthTokens,
     LoginCredentials,
     RegisterData,
     RecitationWithDetails,
-    RecitationAudioResponse,
+    StudentProgressStats,
+    Community,
+    CommunityCreate,
+    Donation,
+    DonationCreate,
+    DonationStats,
+    PaymentInitiationResponse,
+    UserFeedback,
+    UserFeedbackCreate,
 } from '../types';
 import { offlineStorage } from './offlineStorage';
 
-// Determine API base URL based on how the app is accessed
 const getApiBaseUrl = () => {
-    // If we have an explicit environment variable, use it
     if (import.meta.env.REACT_APP_API_URL) {
         return import.meta.env.REACT_APP_API_URL;
     }
-
-    // If running on port 3000 (direct Vite), use direct backend
     if (window.location.port === '3000') {
         return 'http://localhost:8000';
     }
-
-    // If running through nginx (port 80 or no port), use relative URL
     return window.location.origin;
 };
 
@@ -38,50 +41,54 @@ class ApiService {
         this.token = localStorage.getItem('access_token');
     }
 
-    private getHeaders(): HeadersInit {
-        const headers: HeadersInit = {
-            'Content-Type': 'application/json',
-        };
-
-        if (this.token) {
-            headers['Authorization'] = `Bearer ${this.token}`;
+    private getHeaders(includeJson = true): HeadersInit {
+        const headers: Record<string, string> = {};
+        if (includeJson) {
+            headers['Content-Type'] = 'application/json';
         }
-
+        const activeToken = this.token || localStorage.getItem('access_token');
+        if (activeToken) {
+            headers['Authorization'] = `Bearer ${activeToken}`;
+        }
         return headers;
     }
 
     private async request<T>(
-    endpoint: string,
-    options: RequestInit = {},
-): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
-    const config: RequestInit = {
-        headers: this.getHeaders(),
-        ...options,
-    };
+        endpoint: string,
+        options: RequestInit = {},
+        isMultipart = false,
+    ): Promise<T> {
+        const url = `${this.baseURL}${endpoint}`;
+        const config: RequestInit = {
+            ...options,
+            headers: {
+                ...this.getHeaders(!isMultipart),
+                ...(options.headers || {}),
+            },
+        };
 
-    const response = await fetch(url, config);
+        const response = await fetch(url, config);
 
-    if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || `HTTP error! status: ${response.status}`);
+        if (response.status === 401) {
+            this.logout();
+            throw new Error('Session expired. Please sign in again.');
+        }
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP error! status: ${response.status}`);
+        }
+
+        const contentType = response.headers.get('Content-Type') || '';
+        if (contentType.startsWith('audio/') || contentType.includes('octet-stream')) {
+            const blob = await response.blob();
+            return blob as unknown as T;
+        }
+
+        return response.json() as Promise<T>;
     }
 
-    // Detect if the response is binary (audio, image, pdf, etc.)
-    const contentType = response.headers.get("Content-Type") || "";
-
-    if (contentType.startsWith("audio/") || contentType.includes("octet-stream")) {
-        // Return blob for audio file
-        const blob = await response.blob();
-        return blob as unknown as T;
-    }
-
-    // Default JSON
-    return response.json() as Promise<T>;
-}
-
-
-    // Auth methods
+    // Auth
     async login(credentials: LoginCredentials): Promise<AuthTokens> {
         const formData = new FormData();
         formData.append('username', credentials.username);
@@ -93,10 +100,10 @@ class ApiService {
         });
 
         if (!response.ok) {
-            throw new Error('Login failed');
+            throw new Error('Invalid username or password');
         }
 
-        const tokens = await response.json();
+        const tokens: AuthTokens = await response.json();
         this.token = tokens.access_token;
         localStorage.setItem('access_token', tokens.access_token);
         return tokens;
@@ -114,55 +121,75 @@ class ApiService {
         localStorage.removeItem('access_token');
     }
 
-    // User methods
     async getCurrentUser(): Promise<User> {
         return this.request<User>('/users/me');
     }
 
-    // Recitation methods
-    async createRecitation(recitationData: {
+    // Recitations (multipart primary, offline IndexedDB fallback)
+    async uploadRecitation(params: {
         surah_name: string;
         ayah_start: number;
         ayah_end: number;
-        audio_data?: string;
+        audioBlob: Blob;
         duration?: number;
-    }): Promise<Recitation> {
-        // Try online first
+    }): Promise<Recitation & { queuedOffline?: boolean }> {
         if (offlineStorage.isOnline()) {
             try {
-                return await this.request<Recitation>('/recitations/', {
-                    method: 'POST',
-                    body: JSON.stringify(recitationData),
-                });
+                const formData = new FormData();
+                formData.append('surah_name', params.surah_name);
+                formData.append('ayah_start', String(params.ayah_start));
+                formData.append('ayah_end', String(params.ayah_end));
+                if (params.duration !== undefined) {
+                    formData.append('duration', String(params.duration));
+                }
+                formData.append('file', params.audioBlob, 'recitation.webm');
+
+                return await this.request<Recitation>(
+                    '/recitations/upload',
+                    {
+                        method: 'POST',
+                        body: formData,
+                    },
+                    true,
+                );
             } catch (error) {
-                // If online request fails, fall back to offline storage
-                console.log('Online request failed, saving offline');
+                console.warn('Online upload failed, queuing offline:', error);
             }
         }
 
-        // Save for offline submission
-        const pendingId = await offlineStorage.savePendingRecording({
-            data: {
-                ...recitationData,
-                audio_data: recitationData.audio_data || '',
-            },
-            token: this.token || '',
+        const base64Data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = reader.result as string;
+                resolve(result.includes(',') ? result.split(',')[1] : result);
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(params.audioBlob);
         });
 
-        // Register for background sync
-        await offlineStorage.registerBackgroundSync();
+        const pendingId = await offlineStorage.savePendingRecording({
+            data: {
+                surah_name: params.surah_name,
+                ayah_start: params.ayah_start,
+                ayah_end: params.ayah_end,
+                audio_data: base64Data,
+                duration: params.duration,
+            },
+            token: this.token || localStorage.getItem('access_token') || '',
+        });
 
-        // Return a mock recitation object
+        await offlineStorage.registerBackgroundSync().catch(() => {});
+
         return {
-            id: parseInt(pendingId),
+            id: parseInt(pendingId, 10) || Date.now(),
             user_id: 0,
-            surah_name: recitationData.surah_name,
-            ayah_start: recitationData.ayah_start,
-            ayah_end: recitationData.ayah_end,
-            audio_data: recitationData.audio_data,
-            duration: recitationData.duration,
-            status: 'pending' as const,
+            surah_name: params.surah_name,
+            ayah_start: params.ayah_start,
+            ayah_end: params.ayah_end,
+            duration: params.duration,
+            status: 'pending',
             created_at: new Date().toISOString(),
+            queuedOffline: true,
         };
     }
 
@@ -178,11 +205,30 @@ class ApiService {
         return this.request<RecitationWithDetails[]>('/recitations/pending');
     }
 
-    async getRecitationAudio(id: number): Promise<RecitationAudioResponse> {
-        return this.request<RecitationAudioResponse>(`/recitations/audio/${id}`);
+    async getAllScholarRecitations(status?: string): Promise<RecitationWithDetails[]> {
+        const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+        return this.request<RecitationWithDetails[]>(`/recitations/scholar/all${qs}`);
     }
 
-    // Comment methods
+    async updateRecitationStatus(
+        id: number,
+        status: 'pending' | 'reviewed' | 'needs_revision',
+    ): Promise<Recitation> {
+        return this.request<Recitation>(`/recitations/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status }),
+        });
+    }
+
+    async getRecitationAudio(id: number): Promise<Blob> {
+        return this.request<Blob>(`/recitations/audio/${id}`);
+    }
+
+    async getMyProgressStats(): Promise<StudentProgressStats> {
+        return this.request<StudentProgressStats>('/recitations/stats/me');
+    }
+
+    // Comments
     async createComment(commentData: {
         recitation_id: number;
         timestamp: number;
@@ -194,20 +240,54 @@ class ApiService {
         });
     }
 
+    async createCommentWithAudio(params: {
+        recitation_id: number;
+        timestamp: number;
+        text_comment?: string;
+        audioBlob?: Blob;
+    }): Promise<Comment> {
+        const formData = new FormData();
+        formData.append('recitation_id', String(params.recitation_id));
+        formData.append('timestamp', String(params.timestamp));
+        if (params.text_comment) {
+            formData.append('text_comment', params.text_comment);
+        }
+        if (params.audioBlob) {
+            formData.append('audio_file', params.audioBlob, 'feedback.webm');
+        }
+        return this.request<Comment>(
+            '/comments/with-audio',
+            {
+                method: 'POST',
+                body: formData,
+            },
+            true,
+        );
+    }
+
+    async getCommentAudio(commentId: number): Promise<Blob> {
+        return this.request<Blob>(`/comments/audio/${commentId}`);
+    }
+
     async getCommentsForRecitation(recitationId: number): Promise<Comment[]> {
         return this.request<Comment[]>(`/comments/recitation/${recitationId}`);
     }
 
-    async getMyComments(): Promise<Comment[]> {
-        return this.request<Comment[]>('/comments/my-comments');
+    async resolveComment(commentId: number, isResolved: boolean): Promise<Comment> {
+        return this.request<Comment>(`/comments/${commentId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ is_resolved: isResolved }),
+        });
     }
 
-    // Marker methods
+    // Markers & Loop Regions
     async createMarker(markerData: {
         recitation_id: number;
         timestamp: number;
         label: string;
         description?: string;
+        category?: string;
+        color?: string;
     }): Promise<Marker> {
         return this.request<Marker>('/markers/', {
             method: 'POST',
@@ -215,8 +295,87 @@ class ApiService {
         });
     }
 
+    async deleteMarker(markerId: number): Promise<void> {
+        await this.request(`/markers/${markerId}`, { method: 'DELETE' });
+    }
+
     async getMarkersForRecitation(recitationId: number): Promise<Marker[]> {
         return this.request<Marker[]>(`/markers/recitation/${recitationId}`);
+    }
+
+    async createLoopRegion(loopData: {
+        recitation_id: number;
+        start_time: number;
+        end_time: number;
+        label: string;
+        color?: string;
+    }): Promise<LoopRegion> {
+        return this.request<LoopRegion>('/markers/loops/', {
+            method: 'POST',
+            body: JSON.stringify(loopData),
+        });
+    }
+
+    async deleteLoopRegion(loopId: number): Promise<void> {
+        await this.request(`/markers/loops/${loopId}`, { method: 'DELETE' });
+    }
+
+    // Communities
+    async getCommunities(search?: string): Promise<Community[]> {
+        const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+        return this.request<Community[]>(`/communities/${qs}`);
+    }
+
+    async getMyCommunities(): Promise<Community[]> {
+        return this.request<Community[]>('/communities/my-communities');
+    }
+
+    async createCommunity(data: CommunityCreate): Promise<Community> {
+        return this.request<Community>('/communities/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async joinCommunity(communityId: number, message?: string): Promise<{ message: string }> {
+        return this.request<{ message: string }>(`/communities/${communityId}/join`, {
+            method: 'POST',
+            body: JSON.stringify({ community_id: communityId, message }),
+        });
+    }
+
+    async leaveCommunity(communityId: number): Promise<{ message: string }> {
+        return this.request<{ message: string }>(`/communities/${communityId}/leave`, {
+            method: 'DELETE',
+        });
+    }
+
+    // Donations
+    async initiateDonation(data: DonationCreate): Promise<PaymentInitiationResponse> {
+        return this.request<PaymentInitiationResponse>('/donations/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getPublicDonations(): Promise<Donation[]> {
+        return this.request<Donation[]>('/donations/public');
+    }
+
+    async getDonationStats(): Promise<DonationStats> {
+        return this.request<DonationStats>('/donations/stats');
+    }
+
+    // User Feedback
+    async submitUserFeedback(data: UserFeedbackCreate): Promise<UserFeedback> {
+        return this.request<UserFeedback>('/feedback/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getMyUserFeedback(): Promise<UserFeedback[]> {
+        return this.request<UserFeedback[]>('/feedback/');
     }
 }
 

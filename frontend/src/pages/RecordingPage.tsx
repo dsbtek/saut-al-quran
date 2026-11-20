@@ -1,14 +1,35 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { apiService } from '../services/api';
 import AudioVisualizer from '../components/AudioVisualizer';
+import { SURAHS } from '../data/surahs';
 
 const RecordingPage: React.FC = () => {
-    const [selectedSurah, setSelectedSurah] = useState('');
-    const [ayahRange, setAyahRange] = useState({ start: 1, end: 1 });
+    const [surahQuery, setSurahQuery] = useState('');
+    const [selectedSurahName, setSelectedSurahName] = useState('Al-Fatiha');
+    const [ayahRange, setAyahRange] = useState({ start: 1, end: 7 });
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitMessage, setSubmitMessage] = useState('');
+    const [submitStatus, setSubmitStatus] = useState<{
+        type: 'success' | 'error';
+        message: string;
+    } | null>(null);
+
+    const selectedSurah = useMemo(
+        () => SURAHS.find((s) => s.name === selectedSurahName) || SURAHS[0],
+        [selectedSurahName],
+    );
+
+    const filteredSurahs = useMemo(() => {
+        const q = surahQuery.trim().toLowerCase();
+        if (!q) return SURAHS;
+        return SURAHS.filter(
+            (s) =>
+                s.name.toLowerCase().includes(q) ||
+                s.arabicName.includes(q) ||
+                String(s.number) === q,
+        );
+    }, [surahQuery]);
 
     const {
         isRecording,
@@ -30,284 +51,256 @@ const RecordingPage: React.FC = () => {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const handleStartRecording = async () => {
-        if (!selectedSurah) {
-            alert('Please select a Surah first');
-            return;
+    const handleSurahChange = (name: string) => {
+        setSelectedSurahName(name);
+        const surah = SURAHS.find((s) => s.name === name);
+        if (surah) {
+            setAyahRange({ start: 1, end: Math.min(7, surah.ayahCount) });
         }
+    };
+
+    const handleStartRecording = async () => {
+        setSubmitStatus(null);
         try {
             await startRecording();
         } catch (error) {
-            alert(
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to start recording',
-            );
+            setSubmitStatus({
+                type: 'error',
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not access microphone. Please check permissions.',
+            });
         }
     };
 
     const handleSubmitRecording = async () => {
-        if (!audioBlob || !selectedSurah) {
-            alert('Please complete a recording first');
+        if (!audioBlob) return;
+        if (ayahRange.start < 1 || ayahRange.end < ayahRange.start || ayahRange.end > selectedSurah.ayahCount) {
+            setSubmitStatus({
+                type: 'error',
+                message: `Please choose an Ayah range between 1 and ${selectedSurah.ayahCount} for ${selectedSurah.name}.`,
+            });
             return;
         }
 
         setIsSubmitting(true);
-        setSubmitMessage('');
+        setSubmitStatus(null);
 
         try {
-            // Convert blob to base64
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64Audio = reader.result as string;
-                const base64Data = base64Audio.split(',')[1]; // Remove data:audio/webm;base64, prefix
-                await apiService.createRecitation({
-                    surah_name: selectedSurah,
-                    ayah_start: ayahRange.start,
-                    ayah_end: ayahRange.end,
-                    audio_data: base64Data,
-                    duration: recordingTime,
-                });
+            const result = await apiService.uploadRecitation({
+                surah_name: selectedSurah.name,
+                ayah_start: ayahRange.start,
+                ayah_end: ayahRange.end,
+                audioBlob,
+                duration: recordingTime,
+            });
 
-                setSubmitMessage('Recording submitted successfully!');
-                clearRecording();
-                setSelectedSurah('');
-                setAyahRange({ start: 1, end: 1 });
-            };
-            reader.readAsDataURL(audioBlob);
+            setSubmitStatus({
+                type: 'success',
+                message: result.queuedOffline
+                    ? 'You are offline — your recitation was saved locally and will upload automatically when reconnected.'
+                    : 'Recitation submitted successfully for scholar review!',
+            });
+            clearRecording();
         } catch (error) {
-            setSubmitMessage('Failed to submit recording. Please try again.');
-            console.error('Submit error:', error);
+            setSubmitStatus({
+                type: 'error',
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : 'Failed to submit recording. Please try again.',
+            });
         } finally {
             setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="page-container">
-            <h2>Record Your Recitation</h2>
-
-            <div style={{ marginBottom: '20px' }}>
-                <Link to="/" className="nav-btn">
-                    ← Back to Home
+        <div className="mx-auto max-w-3xl space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-stone-900">Record Recitation</h1>
+                    <p className="text-sm text-stone-600">
+                        Select a Surah and Ayah range, then record using your microphone.
+                    </p>
+                </div>
+                <Link
+                    to="/feedback"
+                    className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+                >
+                    My Submissions →
                 </Link>
             </div>
 
-            <div style={{ marginBottom: '30px' }}>
-                <div style={{ marginBottom: '15px' }}>
-                    <label>Select Surah:</label>
-                    <select
-                        value={selectedSurah}
-                        onChange={(e) => setSelectedSurah(e.target.value)}
-                        style={{ marginLeft: '10px', padding: '5px' }}
-                    >
-                        <option value="">Choose a Surah</option>
-                        <option value="al-fatiha">Al-Fatiha</option>
-                        <option value="al-baqarah">Al-Baqarah</option>
-                        <option value="al-imran">Al-Imran</option>
-                        {/* TODO: Add all Surahs */}
-                    </select>
-                </div>
-
-                <div style={{ marginBottom: '15px' }}>
-                    <label>Ayah Range:</label>
-                    <input
-                        type="number"
-                        value={ayahRange.start}
-                        onChange={(e) =>
-                            setAyahRange({
-                                ...ayahRange,
-                                start: parseInt(e.target.value),
-                            })
-                        }
-                        style={{
-                            marginLeft: '10px',
-                            padding: '5px',
-                            width: '60px',
-                        }}
-                        min="1"
-                    />
-                    <span style={{ margin: '0 10px' }}>to</span>
-                    <input
-                        type="number"
-                        value={ayahRange.end}
-                        onChange={(e) =>
-                            setAyahRange({
-                                ...ayahRange,
-                                end: parseInt(e.target.value),
-                            })
-                        }
-                        style={{ padding: '5px', width: '60px' }}
-                        min="1"
-                    />
-                </div>
-            </div>
-
-            {submitMessage && (
+            {submitStatus && (
                 <div
-                    style={{
-                        padding: '10px',
-                        marginBottom: '20px',
-                        borderRadius: '4px',
-                        backgroundColor: submitMessage.includes('success')
-                            ? '#d4edda'
-                            : '#f8d7da',
-                        color: submitMessage.includes('success')
-                            ? '#155724'
-                            : '#721c24',
-                        border: `1px solid ${
-                            submitMessage.includes('success')
-                                ? '#c3e6cb'
-                                : '#f5c6cb'
-                        }`,
-                    }}
+                    className={`rounded-xl border px-4 py-3 text-sm ${
+                        submitStatus.type === 'success'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                            : 'border-red-200 bg-red-50 text-red-800'
+                    }`}
                 >
-                    {submitMessage}
+                    {submitStatus.message}
                 </div>
             )}
 
-            {/* Audio Visualizer */}
-            <div
-                style={{
-                    marginBottom: '30px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                }}
-            >
-                <AudioVisualizer
-                    stream={mediaStream}
-                    isRecording={isRecording && !isPaused}
-                    height={120}
-                    width={500}
-                    barCount={40}
-                />
+            {/* Surah & Ayah selector */}
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-stone-500">
+                            Search Surah
+                        </label>
+                        <input
+                            type="text"
+                            value={surahQuery}
+                            onChange={(e) => setSurahQuery(e.target.value)}
+                            placeholder="e.g. Mulk, 67, الملك"
+                            disabled={isRecording}
+                            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-emerald-700 focus:outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-stone-500">
+                            Surah ({selectedSurah.ayahCount} Ayahs)
+                        </label>
+                        <select
+                            value={selectedSurahName}
+                            onChange={(e) => handleSurahChange(e.target.value)}
+                            disabled={isRecording}
+                            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-700 focus:outline-none"
+                        >
+                            {filteredSurahs.map((s) => (
+                                <option key={s.number} value={s.name}>
+                                    {s.number}. {s.name} — {s.arabicName}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-stone-100">
+                    <div>
+                        <label className="mr-2 text-sm font-medium text-stone-700">From Ayah</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={selectedSurah.ayahCount}
+                            value={ayahRange.start}
+                            disabled={isRecording}
+                            onChange={(e) =>
+                                setAyahRange((prev) => ({
+                                    ...prev,
+                                    start: Math.max(1, parseInt(e.target.value, 10) || 1),
+                                }))
+                            }
+                            className="w-20 rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="mr-2 text-sm font-medium text-stone-700">To Ayah</label>
+                        <input
+                            type="number"
+                            min={ayahRange.start}
+                            max={selectedSurah.ayahCount}
+                            value={ayahRange.end}
+                            disabled={isRecording}
+                            onChange={(e) =>
+                                setAyahRange((prev) => ({
+                                    ...prev,
+                                    end: Math.max(prev.start, parseInt(e.target.value, 10) || prev.start),
+                                }))
+                            }
+                            className="w-20 rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm"
+                        />
+                    </div>
+                    <div className="ml-auto font-arabic text-xl text-emerald-900">
+                        سورة {selectedSurah.arabicName}
+                    </div>
+                </div>
             </div>
 
-            {/* Recording Controls */}
-            <div style={{ marginBottom: '30px', textAlign: 'center' }}>
+            {/* Recorder card */}
+            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm text-center space-y-5">
+                <div className="flex justify-center overflow-hidden rounded-xl bg-stone-50 p-3 border border-stone-100">
+                    <AudioVisualizer
+                        stream={mediaStream}
+                        isRecording={isRecording && !isPaused}
+                        height={110}
+                        width={520}
+                        barCount={44}
+                    />
+                </div>
+
                 {!isRecording && !audioBlob && (
                     <button
                         onClick={handleStartRecording}
-                        className="btn btn-primary"
-                        style={{
-                            fontSize: '18px',
-                            padding: '15px 30px',
-                            marginRight: '10px',
-                        }}
+                        className="inline-flex items-center gap-2 rounded-full bg-emerald-800 px-8 py-3.5 text-base font-semibold text-white hover:bg-emerald-900 shadow-sm transition"
                     >
                         🎤 Start Recording
                     </button>
                 )}
 
                 {isRecording && (
-                    <div>
-                        <div
-                            style={{
-                                marginBottom: '20px',
-                                fontSize: '24px',
-                                color: '#dc3545',
-                            }}
-                        >
-                            🔴 {formatTime(recordingTime)}
+                    <div className="space-y-4">
+                        <div className="font-mono text-2xl font-bold text-red-600">
+                            ● {formatTime(recordingTime)}
                         </div>
-                        <div>
+                        <div className="flex justify-center gap-3">
                             {!isPaused ? (
                                 <button
                                     onClick={pauseRecording}
-                                    className="btn btn-secondary"
-                                    style={{
-                                        fontSize: '16px',
-                                        padding: '10px 20px',
-                                        marginRight: '10px',
-                                    }}
+                                    className="rounded-xl border border-stone-300 bg-white px-5 py-2.5 text-sm font-semibold text-stone-800 hover:bg-stone-50"
                                 >
-                                    ⏸️ Pause
+                                    ⏸ Pause
                                 </button>
                             ) : (
                                 <button
                                     onClick={resumeRecording}
-                                    className="btn btn-primary"
-                                    style={{
-                                        fontSize: '16px',
-                                        padding: '10px 20px',
-                                        marginRight: '10px',
-                                    }}
+                                    className="rounded-xl bg-emerald-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900"
                                 >
-                                    ▶️ Resume
+                                    ▶ Resume
                                 </button>
                             )}
                             <button
                                 onClick={stopRecording}
-                                className="btn btn-secondary"
-                                style={{
-                                    fontSize: '16px',
-                                    padding: '10px 20px',
-                                }}
+                                className="rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-800"
                             >
-                                ⏹️ Stop
+                                ⏹ Stop
                             </button>
                         </div>
                     </div>
                 )}
 
                 {audioBlob && !isRecording && (
-                    <div>
-                        <div style={{ marginBottom: '20px' }}>
-                            <h4>
-                                Recording Complete ({formatTime(recordingTime)})
-                            </h4>
-                            <audio
-                                controls
-                                src={audioURL || undefined}
-                                style={{ width: '100%', maxWidth: '400px' }}
-                            />
+                    <div className="space-y-4">
+                        <div className="text-sm font-semibold text-stone-700">
+                            Preview ({formatTime(recordingTime)}) — {(audioBlob.size / 1024).toFixed(0)} KB
                         </div>
-                        <div>
+                        <audio
+                            controls
+                            src={audioURL || undefined}
+                            className="mx-auto w-full max-w-md"
+                        />
+                        <div className="flex flex-wrap justify-center gap-3">
                             <button
                                 onClick={handleSubmitRecording}
-                                className="btn btn-primary"
-                                style={{
-                                    fontSize: '16px',
-                                    padding: '12px 24px',
-                                    marginRight: '10px',
-                                }}
                                 disabled={isSubmitting}
+                                className="rounded-xl bg-emerald-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-50"
                             >
-                                {isSubmitting
-                                    ? 'Submitting...'
-                                    : '📤 Submit Recording'}
+                                {isSubmitting ? 'Uploading...' : '📤 Submit for Review'}
                             </button>
                             <button
                                 onClick={clearRecording}
-                                className="btn btn-secondary"
-                                style={{
-                                    fontSize: '16px',
-                                    padding: '12px 24px',
-                                }}
+                                disabled={isSubmitting}
+                                className="rounded-xl border border-stone-300 bg-white px-5 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
                             >
-                                🗑️ Clear & Re-record
+                                🗑 Re-record
                             </button>
                         </div>
                     </div>
                 )}
-            </div>
-
-            <div
-                style={{
-                    marginTop: '40px',
-                    padding: '20px',
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: '5px',
-                }}
-            >
-                <h4>Recording Tips:</h4>
-                <ul style={{ textAlign: 'left' }}>
-                    <li>Ensure you're in a quiet environment</li>
-                    <li>Speak clearly and at a moderate pace</li>
-                    <li>Hold your device at a consistent distance</li>
-                    <li>You can pause and resume recording as needed</li>
-                    <li>Listen to your recording before submitting</li>
-                </ul>
             </div>
         </div>
     );

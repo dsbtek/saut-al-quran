@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface AudioVisualizerProps {
     stream: MediaStream | null;
@@ -23,7 +23,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     const animationRef = useRef<number>();
     const analyserRef = useRef<AnalyserNode | null>(null);
     const dataArrayRef = useRef<Uint8Array | null>(null);
-    const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
 
     useEffect(() => {
         if (stream && isRecording) {
@@ -50,7 +50,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
 
-            setAudioContext(context);
+            audioContextRef.current = context;
             analyserRef.current = analyser;
             dataArrayRef.current = dataArray;
 
@@ -84,7 +84,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
             for (let i = 0; i < barCount; i++) {
                 const dataIndex = i * dataStep;
                 const barHeight = (dataArrayRef.current[dataIndex] / 255) * height;
-                
+
                 // Create gradient effect
                 const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
                 gradient.addColorStop(0, color);
@@ -97,7 +97,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
             // Draw rhythm indicator (average amplitude)
             const average = dataArrayRef.current.reduce((sum, value) => sum + value, 0) / dataArrayRef.current.length;
             const rhythmHeight = (average / 255) * height;
-            
+
             // Draw rhythm line
             ctx.strokeStyle = '#ff4444';
             ctx.lineWidth = 2;
@@ -123,12 +123,12 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         if (animationRef.current) {
             cancelAnimationFrame(animationRef.current);
         }
-        if (audioContext && audioContext.state !== 'closed') {
-            audioContext.close();
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            audioContextRef.current.close();
         }
         analyserRef.current = null;
         dataArrayRef.current = null;
-        setAudioContext(null);
+        audioContextRef.current = null;
     };
 
     const drawStaticWave = () => {
@@ -149,7 +149,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
         const centerY = height / 2;
         const amplitude = height * 0.1;
-        
+
         for (let x = 0; x < width; x++) {
             const y = centerY + Math.sin((x / width) * Math.PI * 4) * amplitude;
             if (x === 0) {
@@ -188,6 +188,8 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         >
             <canvas
                 ref={canvasRef}
+                role="img"
+                aria-label="Audio visualizer"
                 width={width}
                 height={height}
                 style={{
@@ -197,7 +199,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
                 }}
             />
             <div style={{ fontSize: '12px', color: '#666', textAlign: 'center' }}>
-                {isRecording ? (
+                {isRecording && stream ? (
                     <>
                         <div style={{ color: '#ff4444', fontWeight: 'bold' }}>
                             🔴 Recording - Speak clearly into your microphone

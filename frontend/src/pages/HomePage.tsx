@@ -1,104 +1,159 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/api';
+import { StudentProgressStats } from '../types';
 
 const HomePage: React.FC = () => {
+    const { user } = useAuth();
+    const [stats, setStats] = useState<StudentProgressStats | null>(null);
+    const isScholarOrAdmin = user?.role === 'scholar' || user?.role === 'admin';
+
+    useEffect(() => {
+        apiService
+            .getMyProgressStats()
+            .then(setStats)
+            .catch(() => setStats(null));
+    }, []);
+
     return (
-        <div className="page-container">
-            <h2>Welcome to Saut Al-Qur'an</h2>
-            <p>
-                Perfect your Qur'an recitation with guidance from certified
-                scholars.
-            </p>
+        <div className="space-y-6">
+            {/* Hero banner */}
+            <section className="rounded-2xl bg-gradient-to-br from-emerald-900 to-emerald-950 p-6 sm:p-8 text-white shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
+                            Assalamu Alaikum, {user?.full_name || user?.username}
+                        </p>
+                        <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight">
+                            Refine your Tajweed &amp; Recitation
+                        </h1>
+                        <p className="mt-2 max-w-xl text-sm text-emerald-100/85">
+                            Record your recitation, practice difficult ayahs with A/B repeat loops,
+                            and receive timestamped text &amp; voice feedback from certified scholars.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                        <Link
+                            to="/record"
+                            className="rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition shadow-sm"
+                        >
+                            🎙️ Start Recording
+                        </Link>
+                        {isScholarOrAdmin && (
+                            <Link
+                                to="/scholar"
+                                className="rounded-xl border border-emerald-600 bg-emerald-800/70 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition"
+                            >
+                                👨‍🏫 Scholar Queue
+                            </Link>
+                        )}
+                    </div>
+                </div>
+            </section>
 
-            <div className="navigation">
-                <Link to="/record" className="nav-btn">
-                    🎤 Start Recording
-                </Link>
-                <Link to="/feedback" className="nav-btn">
-                    💬 View Feedback
-                </Link>
-                <Link to="/communities" className="nav-btn">
-                    🕌 Communities
-                </Link>
-                <Link to="/scholar" className="nav-btn">
-                    👨‍🏫 Scholar Dashboard
-                </Link>
-            </div>
+            {/* Student Progress Summary */}
+            {stats && (
+                <section>
+                    <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-500">
+                        Your Recitation Progress
+                    </h2>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+                            <div className="text-xs font-medium text-stone-500">Total Recitations</div>
+                            <div className="mt-1 text-2xl font-bold text-stone-900">
+                                {stats.total_recitations}
+                            </div>
+                            <div className="mt-1 text-xs text-stone-500">
+                                {stats.pending_count} pending review
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+                            <div className="text-xs font-medium text-stone-500">Reviewed</div>
+                            <div className="mt-1 text-2xl font-bold text-emerald-800">
+                                {stats.reviewed_count}
+                            </div>
+                            <div className="mt-1 text-xs text-amber-700">
+                                {stats.needs_revision_count} need revision
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+                            <div className="text-xs font-medium text-stone-500">Surahs Practiced</div>
+                            <div className="mt-1 text-2xl font-bold text-stone-900">
+                                {stats.surahs_practiced_count}
+                            </div>
+                            <div className="mt-1 truncate text-xs text-stone-500">
+                                {stats.surahs_practiced.length > 0
+                                    ? stats.surahs_practiced.join(', ')
+                                    : 'None yet'}
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+                            <div className="text-xs font-medium text-stone-500">Feedback Notes</div>
+                            <div className="mt-1 text-2xl font-bold text-stone-900">
+                                {stats.resolved_comments}/{stats.total_comments}
+                            </div>
+                            <div className="mt-1 text-xs text-stone-500">
+                                resolved ({stats.unresolved_comments} open)
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
 
-            <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                    gap: '16px',
-                    marginTop: '30px',
-                }}
-            >
+            {/* Quick Navigation Cards */}
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Link
+                    to="/feedback"
+                    className="group rounded-2xl border border-stone-200 bg-white p-5 shadow-sm hover:border-emerald-600 transition"
+                >
+                    <div className="text-2xl mb-2">🎧</div>
+                    <h3 className="text-base font-semibold text-stone-900 group-hover:text-emerald-800">
+                        My Feedback &amp; Recordings
+                    </h3>
+                    <p className="mt-1 text-sm text-stone-600">
+                        Listen to scholar comments, jump to timestamps, and track resolved notes.
+                    </p>
+                </Link>
+
+                <Link
+                    to="/communities"
+                    className="group rounded-2xl border border-stone-200 bg-white p-5 shadow-sm hover:border-emerald-600 transition"
+                >
+                    <div className="text-2xl mb-2">🕌</div>
+                    <h3 className="text-base font-semibold text-stone-900 group-hover:text-emerald-800">
+                        Islamiyya Communities
+                    </h3>
+                    <p className="mt-1 text-sm text-stone-600">
+                        Join local learning circles and connect with teachers and peers.
+                    </p>
+                </Link>
+
                 <Link
                     to="/donations"
-                    style={{
-                        display: 'block',
-                        padding: '20px',
-                        backgroundColor: '#e8f5e8',
-                        border: '1px solid #c3e6cb',
-                        borderRadius: '8px',
-                        textDecoration: 'none',
-                        color: '#155724',
-                        textAlign: 'center',
-                    }}
+                    className="group rounded-2xl border border-stone-200 bg-white p-5 shadow-sm hover:border-emerald-600 transition"
                 >
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>
-                        💝
-                    </div>
-                    <h3 style={{ margin: '0 0 8px 0' }}>Support Us</h3>
-                    <p style={{ margin: 0, fontSize: '14px' }}>
-                        Help maintain and improve the app
+                    <div className="text-2xl mb-2">💝</div>
+                    <h3 className="text-base font-semibold text-stone-900 group-hover:text-emerald-800">
+                        Support Saut Al-Qur&apos;an
+                    </h3>
+                    <p className="mt-1 text-sm text-stone-600">
+                        Contribute to keeping scholar reviews accessible for everyone.
                     </p>
                 </Link>
+            </section>
 
+            <section className="flex items-center justify-between rounded-xl border border-stone-200 bg-white px-5 py-4 text-sm">
+                <span className="text-stone-600">
+                    Have a bug report or feature idea?
+                </span>
                 <Link
                     to="/user-feedback"
-                    style={{
-                        display: 'block',
-                        padding: '20px',
-                        backgroundColor: '#e7f3ff',
-                        border: '1px solid #b3d7ff',
-                        borderRadius: '8px',
-                        textDecoration: 'none',
-                        color: '#0066cc',
-                        textAlign: 'center',
-                    }}
+                    className="font-semibold text-emerald-800 hover:underline"
                 >
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>
-                        📝
-                    </div>
-                    <h3 style={{ margin: '0 0 8px 0' }}>Send Feedback</h3>
-                    <p style={{ margin: 0, fontSize: '14px' }}>
-                        Report bugs or suggest features
-                    </p>
+                    Send App Feedback →
                 </Link>
-            </div>
-
-            <div style={{ marginTop: '40px', textAlign: 'left' }}>
-                <h3>Features:</h3>
-                <ul>
-                    <li>
-                        🎙️ Record your Qur'an recitation with real-time audio
-                        visualization
-                    </li>
-                    <li>🔁 Practice with repeat loops</li>
-                    <li>🔖 Add timestamped markers</li>
-                    <li>💬 Receive feedback from certified scholars</li>
-                    <li>
-                        🕌 Join Islamic communities (Islamiyya) for group
-                        learning
-                    </li>
-                    <li>👥 Connect with scholars and fellow learners</li>
-                    <li>📈 Track your progress within your community</li>
-                    <li>💝 Support the app through donations</li>
-                    <li>📝 Provide feedback to help us improve</li>
-                    <li>📱 Works offline (PWA)</li>
-                </ul>
-            </div>
+            </section>
         </div>
     );
 };

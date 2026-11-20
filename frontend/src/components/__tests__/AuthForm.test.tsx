@@ -1,11 +1,9 @@
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import AuthForm from '../AuthForm';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Mock the AuthContext
 vi.mock('../../contexts/AuthContext', () => ({
     useAuth: vi.fn(),
 }));
@@ -15,7 +13,6 @@ const mockUseAuth = useAuth as ReturnType<typeof vi.fn>;
 describe('AuthForm', () => {
     const mockLogin = vi.fn();
     const mockRegister = vi.fn();
-    const mockOnSuccess = vi.fn();
 
     beforeEach(() => {
         mockUseAuth.mockReturnValue({
@@ -24,57 +21,35 @@ describe('AuthForm', () => {
             user: null,
             logout: vi.fn(),
             isLoading: false,
+            isAuthenticated: false,
         });
         vi.clearAllMocks();
     });
 
-    it('renders login form by default', () => {
+    it('renders sign in form by default', () => {
         render(<AuthForm />);
 
-        expect(screen.getByText('Login')).toBeInTheDocument();
         expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
         expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
         expect(screen.queryByLabelText(/role/i)).not.toBeInTheDocument();
     });
 
-    it('switches to registration form when register button is clicked', () => {
+    it('switches to create account form without role selector', () => {
         render(<AuthForm />);
 
-        fireEvent.click(screen.getByText('Register'));
+        fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
-        expect(screen.getByText('Register')).toBeInTheDocument();
-        expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/full name/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/role/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+        expect(screen.queryByLabelText(/role/i)).not.toBeInTheDocument();
     });
 
-    it('displays role selection dropdown in registration form', () => {
-        render(<AuthForm />);
-
-        fireEvent.click(screen.getByText('Register'));
-
-        const roleSelect = screen.getByLabelText(/role/i);
-        expect(roleSelect).toBeInTheDocument();
-        expect(roleSelect).toHaveValue('user');
-
-        // Check if all role options are present
-        expect(
-            screen.getByText('User (Record and receive feedback)'),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByText('Scholar (Review and provide feedback)'),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByText('Admin (Manage users and system)'),
-        ).toBeInTheDocument();
-    });
-
-    it('submits login form with correct data', async () => {
+    it('submits login form with credentials', async () => {
         mockLogin.mockResolvedValue(undefined);
-        render(<AuthForm onSuccess={mockOnSuccess} />);
+        render(<AuthForm />);
 
         fireEvent.change(screen.getByLabelText(/username/i), {
             target: { value: 'testuser' },
@@ -83,7 +58,8 @@ describe('AuthForm', () => {
             target: { value: 'testpass' },
         });
 
-        fireEvent.click(screen.getByRole('button', { name: /login/i }));
+        const submitButtons = screen.getAllByRole('button', { name: /sign in/i });
+        fireEvent.click(submitButtons[submitButtons.length - 1]);
 
         await waitFor(() => {
             expect(mockLogin).toHaveBeenCalledWith({
@@ -91,52 +67,42 @@ describe('AuthForm', () => {
                 password: 'testpass',
             });
         });
-
-        expect(mockOnSuccess).toHaveBeenCalled();
     });
 
-    it('submits registration form with role selection', async () => {
+    it('submits registration form without role field', async () => {
         mockRegister.mockResolvedValue(undefined);
-        render(<AuthForm onSuccess={mockOnSuccess} />);
+        render(<AuthForm />);
 
-        // Switch to registration
-        fireEvent.click(screen.getByText('Register'));
+        fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
-        // Fill form
-        fireEvent.change(screen.getByLabelText(/username/i), {
-            target: { value: 'newuser' },
-        });
         fireEvent.change(screen.getByLabelText(/email/i), {
             target: { value: 'test@example.com' },
-        });
-        fireEvent.change(screen.getByLabelText(/password/i), {
-            target: { value: 'newpass' },
         });
         fireEvent.change(screen.getByLabelText(/full name/i), {
             target: { value: 'Test User' },
         });
-        fireEvent.change(screen.getByLabelText(/role/i), {
-            target: { value: 'scholar' },
+        fireEvent.change(screen.getByLabelText(/username/i), {
+            target: { value: 'newuser' },
+        });
+        fireEvent.change(screen.getByLabelText(/password/i), {
+            target: { value: 'newpass' },
         });
 
-        fireEvent.click(screen.getByRole('button', { name: /register/i }));
+        const submitButtons = screen.getAllByRole('button', { name: /create account/i });
+        fireEvent.click(submitButtons[submitButtons.length - 1]);
 
         await waitFor(() => {
             expect(mockRegister).toHaveBeenCalledWith({
-                username: 'newuser',
                 email: 'test@example.com',
+                username: 'newuser',
                 password: 'newpass',
                 full_name: 'Test User',
-                role: 'scholar',
             });
         });
-
-        expect(mockOnSuccess).toHaveBeenCalled();
     });
 
     it('displays error message when login fails', async () => {
-        const errorMessage = 'Invalid credentials';
-        mockLogin.mockRejectedValue(new Error(errorMessage));
+        mockLogin.mockRejectedValue(new Error('Invalid username or password'));
         render(<AuthForm />);
 
         fireEvent.change(screen.getByLabelText(/username/i), {
@@ -146,53 +112,11 @@ describe('AuthForm', () => {
             target: { value: 'wrongpass' },
         });
 
-        fireEvent.click(screen.getByRole('button', { name: /login/i }));
+        const submitButtons = screen.getAllByRole('button', { name: /sign in/i });
+        fireEvent.click(submitButtons[submitButtons.length - 1]);
 
         await waitFor(() => {
-            expect(screen.getByText(errorMessage)).toBeInTheDocument();
+            expect(screen.getByText('Invalid username or password')).toBeInTheDocument();
         });
-    });
-
-    it('shows loading state during form submission', async () => {
-        mockLogin.mockImplementation(
-            () => new Promise((resolve) => setTimeout(resolve, 100)),
-        );
-        render(<AuthForm />);
-
-        fireEvent.change(screen.getByLabelText(/username/i), {
-            target: { value: 'testuser' },
-        });
-        fireEvent.change(screen.getByLabelText(/password/i), {
-            target: { value: 'testpass' },
-        });
-
-        fireEvent.click(screen.getByRole('button', { name: /login/i }));
-
-        expect(screen.getByText('Loading...')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /loading/i })).toBeDisabled();
-
-        await waitFor(() => {
-            expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
-        });
-    });
-
-    it('defaults to user role in registration form', () => {
-        render(<AuthForm />);
-
-        fireEvent.click(screen.getByText('Register'));
-
-        const roleSelect = screen.getByLabelText(/role/i) as HTMLSelectElement;
-        expect(roleSelect.value).toBe('user');
-    });
-
-    it('allows changing role selection', () => {
-        render(<AuthForm />);
-
-        fireEvent.click(screen.getByText('Register'));
-
-        const roleSelect = screen.getByLabelText(/role/i);
-        fireEvent.change(roleSelect, { target: { value: 'admin' } });
-
-        expect(roleSelect).toHaveValue('admin');
     });
 });

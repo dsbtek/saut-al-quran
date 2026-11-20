@@ -1,21 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Recitation, Comment, Marker } from '../types';
+import { Recitation, RecitationWithDetails } from '../types';
 import { apiService } from '../services/api';
-import WaveformPlayer from '../components/WaveformPlayer';
-import MarkerList from '../components/MarkerList';
+import UnifiedWaveformPlayer from '../components/UnifiedWaveformPlayer';
+
+const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const statusBadge = (status: Recitation['status']) => {
+    switch (status) {
+        case 'reviewed':
+            return 'bg-emerald-100 text-emerald-900 border-emerald-200';
+        case 'needs_revision':
+            return 'bg-amber-100 text-amber-900 border-amber-200';
+        default:
+            return 'bg-stone-100 text-stone-700 border-stone-200';
+    }
+};
 
 const FeedbackPage: React.FC = () => {
     const [recitations, setRecitations] = useState<Recitation[]>([]);
-    const [selectedRecitation, setSelectedRecitation] =
-        useState<Recitation | null>(null);
-    const [comments, setComments] = useState<Comment[]>([]);
-    const [markers, setMarkers] = useState<Marker[]>([]);
+    const [selected, setSelected] = useState<RecitationWithDetails | null>(null);
+    const [audioUrl, setAudioUrl] = useState<string>('');
+    const [commentAudioUrls, setCommentAudioUrls] = useState<Record<number, string>>({});
+    const [seekTime, setSeekTime] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
 
+    const objectUrlRef = useRef<string | null>(null);
+
     useEffect(() => {
         loadRecitations();
+        return () => {
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        };
     }, []);
 
     const loadRecitations = async () => {
@@ -24,352 +45,274 @@ const FeedbackPage: React.FC = () => {
             const data = await apiService.getRecitations();
             setRecitations(data);
         } catch (err) {
-            setError('Failed to load recitations');
-            console.error(err);
+            setError(err instanceof Error ? err.message : 'Failed to load recitations');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const loadRecitationDetails = async (recitation: Recitation) => {
+    const loadDetails = async (recitationId: number) => {
         try {
-            setSelectedRecitation(recitation);
+            setError('');
+            const details = await apiService.getRecitation(recitationId);
+            setSelected(details);
+            setSeekTime(null);
 
-            // Load comments
-            const commentsData = await apiService.getCommentsForRecitation(
-                recitation.id,
-            );
-            setComments(commentsData);
+            if (objectUrlRef.current) {
+                URL.revokeObjectURL(objectUrlRef.current);
+                objectUrlRef.current = null;
+            }
 
-            // Load markers
-            const markersData = await apiService.getMarkersForRecitation(
-                recitation.id,
-            );
-            setMarkers(markersData);
+            if (details.audio_file_path) {
+                const blob = await apiService.getRecitationAudio(details.id);
+                const url = URL.createObjectURL(blob);
+                objectUrlRef.current = url;
+                setAudioUrl(url);
+            } else {
+                setAudioUrl('');
+            }
+
+            // Load any scholar voice feedback audio blobs
+            const voiceUrls: Record<number, string> = {};
+            for (const c of details.comments || []) {
+                if (c.audio_comment_path) {
+                    try {
+                        const cBlob = await apiService.getCommentAudio(c.id);
+                        voiceUrls[c.id] = URL.createObjectURL(cBlob);
+                    } catch {
+                        // Ignore missing comment audio
+                    }
+                }
+            }
+            setCommentAudioUrls(voiceUrls);
         } catch (err) {
-            console.error('Failed to load recitation details:', err);
+            setError(err instanceof Error ? err.message : 'Failed to load recitation details');
         }
     };
 
-    const handleMarkerAdd = async (timestamp: number) => {
-        if (!selectedRecitation) return;
-
-        const label = prompt('Enter marker label:');
-        if (!label) return;
-
-        const description =
-            prompt('Enter description (optional):') || undefined;
-
+    const handleToggleResolve = async (commentId: number, current: boolean) => {
+        if (!selected) return;
         try {
-            const newMarker = await apiService.createMarker({
-                recitation_id: selectedRecitation.id,
-                timestamp,
-                label,
-                description,
+            const updated = await apiService.resolveComment(commentId, !current);
+            setSelected({
+                ...selected,
+                comments: (selected.comments || []).map((c) =>
+                    c.id === commentId ? { ...c, is_resolved: updated.is_resolved } : c,
+                ),
             });
-            setMarkers([...markers, newMarker]);
         } catch (err) {
-            console.error('Failed to create marker:', err);
-            alert('Failed to create marker');
+            setError(err instanceof Error ? err.message : 'Failed to update comment');
         }
-    };
-
-    const handleMarkerClick = (marker: Marker) => {
-        // This would seek the audio to the marker timestamp
-        console.log('Jump to marker:', marker);
-    };
-
-    const getAudioUrl = (recitation: Recitation) => {
-        if (recitation.audio_file_path) {
-            return `${import.meta.env.REACT_APP_API_URL}/files/${
-                recitation.audio_file_path
-            }`;
-        } else if (recitation.audio_data) {
-            return `data:audio/webm;base64,${recitation.audio_data}`;
-        }
-        return '';
     };
 
     if (isLoading) {
-        return (
-            <div className="page-container">
-                <div style={{ textAlign: 'center', padding: '50px' }}>
-                    Loading...
-                </div>
-            </div>
-        );
+        return <div className="py-12 text-center text-sm text-stone-500">Loading your recitations...</div>;
     }
 
     return (
-        <div className="page-container">
-            <h2>Your Feedback</h2>
-
-            <div style={{ marginBottom: '20px' }}>
-                <Link to="/" className="nav-btn">
-                    ← Back to Home
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-stone-900">My Recitations &amp; Feedback</h1>
+                    <p className="text-sm text-stone-600">
+                        Review scholar annotations, jump to timestamps, and mark notes resolved.
+                    </p>
+                </div>
+                <Link
+                    to="/record"
+                    className="rounded-xl bg-emerald-800 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-900"
+                >
+                    + New Recording
                 </Link>
             </div>
 
             {error && (
-                <div
-                    style={{
-                        color: 'red',
-                        backgroundColor: '#ffebee',
-                        padding: '10px',
-                        borderRadius: '4px',
-                        marginBottom: '20px',
-                    }}
-                >
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {error}
                 </div>
             )}
 
-            {!selectedRecitation ? (
-                <div style={{ textAlign: 'left' }}>
-                    <h3>Your Recitations</h3>
-                    {recitations.length === 0 ? (
-                        <div
-                            style={{
-                                textAlign: 'center',
-                                padding: '40px',
-                                color: '#666',
-                            }}
+            {!selected ? (
+                recitations.length === 0 ? (
+                    <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center">
+                        <p className="text-stone-600 mb-4">You haven&apos;t submitted any recitations yet.</p>
+                        <Link
+                            to="/record"
+                            className="inline-block rounded-xl bg-emerald-800 px-5 py-2.5 text-sm font-semibold text-white"
                         >
-                            <p>No recordings submitted yet.</p>
-                            <Link to="/record" className="btn btn-primary">
-                                Record Your First Recitation
-                            </Link>
-                        </div>
-                    ) : (
-                        recitations.map((recitation) => (
+                            Record Your First Recitation
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {recitations.map((rec) => (
                             <div
-                                key={recitation.id}
-                                style={{
-                                    border: '1px solid #ddd',
-                                    borderRadius: '8px',
-                                    padding: '20px',
-                                    marginBottom: '20px',
-                                    backgroundColor:
-                                        recitation.status === 'reviewed'
-                                            ? '#f8fff8'
-                                            : '#fff8f0',
-                                    cursor: 'pointer',
-                                }}
-                                onClick={() =>
-                                    loadRecitationDetails(recitation)
-                                }
+                                key={rec.id}
+                                onClick={() => loadDetails(rec.id)}
+                                className="cursor-pointer rounded-2xl border border-stone-200 bg-white p-5 shadow-sm hover:border-emerald-600 transition"
                             >
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        marginBottom: '10px',
-                                    }}
-                                >
-                                    <h3 style={{ margin: 0 }}>
-                                        {recitation.surah_name} (
-                                        {recitation.ayah_start}-
-                                        {recitation.ayah_end})
-                                    </h3>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-stone-900">
+                                            {rec.surah_name} ({rec.ayah_start}–{rec.ayah_end})
+                                        </h3>
+                                        <p className="mt-1 text-xs text-stone-500">
+                                            Submitted {new Date(rec.created_at).toLocaleDateString()}
+                                            {rec.duration ? ` • ${formatTime(rec.duration)}` : ''}
+                                        </p>
+                                    </div>
                                     <span
-                                        style={{
-                                            padding: '4px 8px',
-                                            borderRadius: '4px',
-                                            fontSize: '12px',
-                                            backgroundColor:
-                                                recitation.status === 'reviewed'
-                                                    ? '#d4edda'
-                                                    : '#fff3cd',
-                                            color:
-                                                recitation.status === 'reviewed'
-                                                    ? '#155724'
-                                                    : '#856404',
-                                        }}
+                                        className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadge(
+                                            rec.status,
+                                        )}`}
                                     >
-                                        {recitation.status}
+                                        {rec.status.replace('_', ' ')}
                                     </span>
                                 </div>
-
-                                <p style={{ margin: '5px 0', color: '#666' }}>
-                                    Submitted:{' '}
-                                    {new Date(
-                                        recitation.created_at,
-                                    ).toLocaleDateString()}
-                                    {recitation.duration &&
-                                        ` | Duration: ${Math.floor(
-                                            recitation.duration / 60,
-                                        )}:${Math.floor(
-                                            recitation.duration % 60,
-                                        )
-                                            .toString()
-                                            .padStart(2, '0')}`}
-                                </p>
-
-                                <div style={{ marginTop: '10px' }}>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            loadRecitationDetails(recitation);
-                                        }}
-                                    >
-                                        View Details
-                                    </button>
+                                <div className="mt-4 text-xs font-semibold text-emerald-800">
+                                    Open Playback &amp; Feedback →
                                 </div>
                             </div>
-                        ))
-                    )}
-                </div>
+                        ))}
+                    </div>
+                )
             ) : (
-                <div>
-                    <div style={{ marginBottom: '20px' }}>
-                        <button
-                            onClick={() => setSelectedRecitation(null)}
-                            className="btn btn-secondary"
-                        >
-                            ← Back to List
-                        </button>
-                    </div>
-
-                    <div style={{ marginBottom: '20px' }}>
-                        <h3>
-                            {selectedRecitation.surah_name} (
-                            {selectedRecitation.ayah_start}-
-                            {selectedRecitation.ayah_end})
-                        </h3>
-                        <p style={{ color: '#666' }}>
-                            Status: {selectedRecitation.status} | Submitted:{' '}
-                            {new Date(
-                                selectedRecitation.created_at,
-                            ).toLocaleDateString()}
-                        </p>
-                    </div>
-
-                    {getAudioUrl(selectedRecitation) && (
-                        <div style={{ marginBottom: '30px' }}>
-                            <h4>Audio Playback</h4>
-                            <WaveformPlayer
-                                audioUrl={getAudioUrl(selectedRecitation)}
-                                markers={markers}
-                                onMarkerAdd={handleMarkerAdd}
-                                onMarkerClick={handleMarkerClick}
-                            />
-                        </div>
-                    )}
-
-                    <div
-                        style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '20px',
-                            marginBottom: '30px',
-                        }}
+                <div className="space-y-5">
+                    <button
+                        onClick={() => setSelected(null)}
+                        className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
                     >
-                        <div>
-                            <h4>Your Markers</h4>
-                            <MarkerList
-                                markers={markers}
-                                onMarkerClick={handleMarkerClick}
-                            />
+                        ← Back to My Recitations
+                    </button>
+
+                    <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-stone-900">
+                                    {selected.surah_name} (Ayah {selected.ayah_start}–{selected.ayah_end})
+                                </h2>
+                                <p className="text-xs text-stone-500">
+                                    Submitted {new Date(selected.created_at).toLocaleString()}
+                                </p>
+                            </div>
+                            <span
+                                className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${statusBadge(
+                                    selected.status,
+                                )}`}
+                            >
+                                {selected.status.replace('_', ' ')}
+                            </span>
                         </div>
 
-                        <div>
-                            <h4>Scholar Comments</h4>
-                            <div
-                                style={{
-                                    maxHeight: '300px',
-                                    overflowY: 'auto',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '4px',
-                                }}
-                            >
-                                {comments.length === 0 ? (
-                                    <div
-                                        style={{
-                                            padding: '20px',
-                                            textAlign: 'center',
-                                            color: '#666',
-                                        }}
-                                    >
-                                        {selectedRecitation.status === 'pending'
-                                            ? 'Waiting for scholar review...'
-                                            : 'No comments yet.'}
-                                    </div>
-                                ) : (
-                                    comments.map((comment) => (
-                                        <div
-                                            key={comment.id}
-                                            style={{
-                                                padding: '15px',
-                                                borderBottom: '1px solid #eee',
-                                                backgroundColor:
-                                                    comment.is_resolved
-                                                        ? '#f8f9fa'
-                                                        : '#fff',
-                                            }}
+                        {audioUrl ? (
+                            <UnifiedWaveformPlayer
+                                audioUrl={audioUrl}
+                                markers={selected.markers || []}
+                                loopRegions={selected.loop_regions || []}
+                                externalSeekTime={seekTime}
+                                onMarkerClick={(m) => setSeekTime(m.timestamp)}
+                            />
+                        ) : (
+                            <div className="rounded-lg bg-stone-50 p-4 text-sm text-stone-500">
+                                Audio file unavailable for this recitation.
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        {/* Markers */}
+                        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+                            <h3 className="mb-3 text-base font-semibold text-stone-900">
+                                Scholar Markers ({selected.markers?.length || 0})
+                            </h3>
+                            {!selected.markers || selected.markers.length === 0 ? (
+                                <p className="text-sm text-stone-500">No markers added yet.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {selected.markers.map((m) => (
+                                        <button
+                                            key={m.id}
+                                            type="button"
+                                            onClick={() => setSeekTime(m.timestamp)}
+                                            className="flex w-full items-start justify-between rounded-xl border border-stone-100 bg-stone-50 p-3 text-left hover:border-emerald-300 hover:bg-emerald-50/40 transition"
                                         >
-                                            <div
-                                                style={{ marginBottom: '5px' }}
-                                            >
-                                                <strong>
-                                                    [
-                                                    {Math.floor(
-                                                        comment.timestamp / 60,
-                                                    )}
-                                                    :
-                                                    {Math.floor(
-                                                        comment.timestamp % 60,
-                                                    )
-                                                        .toString()
-                                                        .padStart(2, '0')}
-                                                    ]
-                                                </strong>
-                                                {comment.scholar && (
-                                                    <span
-                                                        style={{
-                                                            marginLeft: '10px',
-                                                            fontSize: '12px',
-                                                            color: '#666',
-                                                        }}
-                                                    >
-                                                        by{' '}
-                                                        {comment.scholar
-                                                            .full_name ||
-                                                            comment.scholar
-                                                                .username}
-                                                    </span>
+                                            <div>
+                                                <div className="text-sm font-semibold text-stone-900">
+                                                    {m.label}
+                                                </div>
+                                                {m.description && (
+                                                    <div className="mt-0.5 text-xs text-stone-600">
+                                                        {m.description}
+                                                    </div>
                                                 )}
                                             </div>
-                                            <div
-                                                style={{ marginBottom: '10px' }}
-                                            >
-                                                {comment.text_comment}
+                                            <span className="ml-3 rounded bg-white px-2 py-0.5 font-mono text-xs font-semibold text-emerald-800 border border-stone-200">
+                                                {formatTime(m.timestamp)}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Comments */}
+                        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+                            <h3 className="mb-3 text-base font-semibold text-stone-900">
+                                Scholar Feedback ({selected.comments?.length || 0})
+                            </h3>
+                            {!selected.comments || selected.comments.length === 0 ? (
+                                <p className="text-sm text-stone-500">
+                                    {selected.status === 'pending'
+                                        ? 'Waiting for scholar review...'
+                                        : 'No comments on this recitation.'}
+                                </p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {selected.comments.map((c) => (
+                                        <div
+                                            key={c.id}
+                                            className={`rounded-xl border p-3.5 ${c.is_resolved
+                                                ? 'border-stone-200 bg-stone-50/70'
+                                                : 'border-emerald-200 bg-emerald-50/30'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSeekTime(c.timestamp)}
+                                                    className="rounded bg-emerald-800 px-2 py-0.5 font-mono text-xs font-semibold text-white hover:bg-emerald-900"
+                                                >
+                                                    ▶ {formatTime(c.timestamp)}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleResolve(c.id, c.is_resolved)}
+                                                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold border ${c.is_resolved
+                                                        ? 'border-emerald-300 bg-emerald-100 text-emerald-900'
+                                                        : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'
+                                                        }`}
+                                                >
+                                                    {c.is_resolved ? '✓ Resolved' : 'Mark Resolved'}
+                                                </button>
                                             </div>
-                                            <div
-                                                style={{
-                                                    fontSize: '12px',
-                                                    color: '#666',
-                                                }}
-                                            >
-                                                {new Date(
-                                                    comment.created_at,
-                                                ).toLocaleString()}
-                                                {comment.is_resolved && (
-                                                    <span
-                                                        style={{
-                                                            marginLeft: '10px',
-                                                            color: '#28a745',
-                                                        }}
-                                                    >
-                                                        ✓ Resolved
-                                                    </span>
-                                                )}
+                                            {c.text_comment && (
+                                                <p className="mt-2 text-sm text-stone-800">{c.text_comment}</p>
+                                            )}
+                                            {commentAudioUrls[c.id] && (
+                                                <audio
+                                                    controls
+                                                    src={commentAudioUrls[c.id]}
+                                                    className="mt-2 h-9 w-full"
+                                                />
+                                            )}
+                                            <div className="mt-2 text-[11px] text-stone-500">
+                                                By {c.scholar?.full_name || c.scholar?.username || 'Scholar'} •{' '}
+                                                {new Date(c.created_at).toLocaleString()}
                                             </div>
                                         </div>
-                                    ))
-                                )}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

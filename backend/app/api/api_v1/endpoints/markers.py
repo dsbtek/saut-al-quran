@@ -69,16 +69,14 @@ def update_marker(
     marker_id: int,
     marker_update: MarkerUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user)
+    current_user: User = Depends(deps.get_current_scholar)
 ):
     marker = db.query(Marker).filter(Marker.id == marker_id).first()
     if marker is None:
         raise HTTPException(status_code=404, detail="Marker not found")
 
-    # Verify user owns the recitation
-    recitation = db.query(Recitation).filter(
-        Recitation.id == marker.recitation_id).first()
-    if recitation.user_id != current_user.id:
+    # Only the scholar who created the marker or admin can update
+    if marker.scholar_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
     update_data = marker_update.dict(exclude_unset=True)

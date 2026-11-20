@@ -1,424 +1,242 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import { Community, CommunityCreate } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import CommunityCard from '../components/CommunityCard';
-import CommunityForm from '../components/CommunityForm';
+import { apiService } from '../services/api';
 
 const CommunitiesPage: React.FC = () => {
     const { user } = useAuth();
     const [communities, setCommunities] = useState<Community[]>([]);
     const [myCommunities, setMyCommunities] = useState<Community[]>([]);
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'my'>('all');
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [form, setForm] = useState<CommunityCreate>({ name: '', description: '', location: '', address: '' });
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    // Mock data for demonstration
+    const canCreate = user?.role === 'scholar' || user?.role === 'admin';
+
     useEffect(() => {
-        // In a real app, these would be API calls
-        const mockCommunities: Community[] = [
-            {
-                id: 1,
-                name: 'Darul Hikmah Islamiyya',
-                description:
-                    'A community focused on Quranic studies and Tajweed improvement',
-                location: 'Lagos, Nigeria',
-                address: '123 Islamic Center Road, Victoria Island, Lagos',
-                is_active: true,
-                created_by: 1,
-                created_at: '2024-01-15T10:00:00Z',
-                member_count: 45,
-                scholar_count: 3,
-            },
-            {
-                id: 2,
-                name: 'Masjid Al-Noor Learning Circle',
-                description:
-                    'Weekly Quran recitation sessions with certified scholars',
-                location: 'Abuja, Nigeria',
-                address: 'Central Mosque Complex, Abuja',
-                is_active: true,
-                created_by: 2,
-                created_at: '2024-02-01T14:30:00Z',
-                member_count: 28,
-                scholar_count: 2,
-            },
-            {
-                id: 3,
-                name: 'Youth Quran Academy',
-                description:
-                    'Dedicated to teaching young Muslims proper Quran recitation',
-                location: 'Kano, Nigeria',
-                address: 'Youth Islamic Center, Kano',
-                is_active: true,
-                created_by: 3,
-                created_at: '2024-01-20T09:15:00Z',
-                member_count: 67,
-                scholar_count: 4,
-            },
-        ];
+        loadData();
+    }, []);
 
-        setCommunities(mockCommunities);
-
-        // Mock user's communities
-        if (user) {
-            setMyCommunities(mockCommunities.slice(0, 1)); // User is member of first community
-        }
-    }, [user]);
-
-    const handleCreateCommunity = async (communityData: CommunityCreate) => {
-        setIsLoading(true);
+    const loadData = async (search?: string) => {
         try {
-            // Mock API call
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            setIsLoading(true);
+            setError('');
+            const [allList, myList] = await Promise.all([
+                apiService.getCommunities(search),
+                apiService.getMyCommunities(),
+            ]);
+            setCommunities(allList);
+            setMyCommunities(myList);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load communities');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-            const newCommunity: Community = {
-                id: Date.now(),
-                ...communityData,
-                is_active: true,
-                created_by: user?.id || 0,
-                created_at: new Date().toISOString(),
-                member_count: 1,
-                scholar_count:
-                    user?.role === 'scholar' || user?.role === 'admin' ? 1 : 0,
-            };
-
-            setCommunities((prev) => [newCommunity, ...prev]);
-            setMyCommunities((prev) => [newCommunity, ...prev]);
+    const handleCreate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!form.name.trim()) return;
+        try {
+            await apiService.createCommunity(form);
+            setForm({ name: '', description: '', location: '', address: '' });
             setShowCreateForm(false);
-        } catch (error) {
-            console.error('Error creating community:', error);
-        } finally {
-            setIsLoading(false);
+            await loadData(searchTerm);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to create community');
         }
     };
 
-    const handleJoinCommunity = async (communityId: number) => {
-        setIsLoading(true);
+    const handleJoin = async (id: number) => {
         try {
-            // Mock API call
-            await new Promise((resolve) => setTimeout(resolve, 500));
-
-            const community = communities.find((c) => c.id === communityId);
-            if (community) {
-                setMyCommunities((prev) => [...prev, community]);
-                setCommunities((prev) =>
-                    prev.map((c) =>
-                        c.id === communityId
-                            ? { ...c, member_count: (c.member_count || 0) + 1 }
-                            : c,
-                    ),
-                );
-            }
-        } catch (error) {
-            console.error('Error joining community:', error);
-        } finally {
-            setIsLoading(false);
+            await apiService.joinCommunity(id);
+            await loadData(searchTerm);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to join community');
         }
     };
 
-    const handleLeaveCommunity = async (communityId: number) => {
-        setIsLoading(true);
+    const handleLeave = async (id: number) => {
         try {
-            // Mock API call
-            await new Promise((resolve) => setTimeout(resolve, 500));
-
-            setMyCommunities((prev) =>
-                prev.filter((c) => c.id !== communityId),
-            );
-            setCommunities((prev) =>
-                prev.map((c) =>
-                    c.id === communityId
-                        ? {
-                              ...c,
-                              member_count: Math.max(
-                                  (c.member_count || 1) - 1,
-                                  0,
-                              ),
-                          }
-                        : c,
-                ),
-            );
-        } catch (error) {
-            console.error('Error leaving community:', error);
-        } finally {
-            setIsLoading(false);
+            await apiService.leaveCommunity(id);
+            await loadData(searchTerm);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to leave community');
         }
     };
 
-    const filteredCommunities = communities.filter(
-        (community) =>
-            community.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            community.description
-                ?.toLowerCase()
-                .includes(searchTerm.toLowerCase()) ||
-            community.location
-                ?.toLowerCase()
-                .includes(searchTerm.toLowerCase()),
-    );
-
-    const isUserMember = (communityId: number) => {
-        return myCommunities.some((c) => c.id === communityId);
-    };
-
-    const canCreateCommunity =
-        user?.role === 'admin' || user?.role === 'scholar';
-
-    if (showCreateForm) {
-        return (
-            <div
-                style={{
-                    padding: '20px',
-                    maxWidth: '1200px',
-                    margin: '0 auto',
-                }}
-            >
-                <CommunityForm
-                    onSubmit={handleCreateCommunity}
-                    onCancel={() => setShowCreateForm(false)}
-                    isLoading={isLoading}
-                />
-            </div>
-        );
-    }
+    const myIds = new Set(myCommunities.map((c) => c.id));
+    const displayed = activeTab === 'my' ? myCommunities : communities;
 
     return (
-        <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '20px' }}>
-                <Link
-                    to="/"
-                    style={{
-                        display: 'inline-block',
-                        padding: '8px 16px',
-                        backgroundColor: '#f8f9fa',
-                        color: '#007bff',
-                        textDecoration: 'none',
-                        borderRadius: '4px',
-                        border: '1px solid #007bff',
-                    }}
-                >
-                    ← Back to Home
-                </Link>
-            </div>
-
-            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                <h1 style={{ color: '#333', marginBottom: '8px' }}>
-                    🕌 Islamic Communities (Islamiyya)
-                </h1>
-                <p style={{ color: '#666', fontSize: '16px' }}>
-                    Join or create communities to learn and improve your Quran
-                    recitation together
-                </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div
-                style={{
-                    display: 'flex',
-                    gap: '12px',
-                    marginBottom: '24px',
-                    justifyContent: 'center',
-                }}
-            >
-                {canCreateCommunity && (
+        <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-stone-900">Islamiyya Communities</h1>
+                    <p className="text-sm text-stone-600">
+                        Connect with local Qur&apos;an learning circles and certified teachers.
+                    </p>
+                </div>
+                {canCreate && (
                     <button
-                        onClick={() => setShowCreateForm(true)}
-                        style={{
-                            padding: '12px 24px',
-                            backgroundColor: '#007bff',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                        }}
+                        type="button"
+                        onClick={() => setShowCreateForm(!showCreateForm)}
+                        className="rounded-xl bg-emerald-800 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-900"
                     >
-                        ➕ Create Community
+                        {showCreateForm ? 'Cancel' : '+ Create Community'}
                     </button>
                 )}
             </div>
 
-            {/* Tabs */}
-            <div
-                style={{
-                    display: 'flex',
-                    marginBottom: '24px',
-                    borderBottom: '1px solid #ddd',
-                }}
-            >
-                <button
-                    onClick={() => setActiveTab('all')}
-                    style={{
-                        padding: '12px 24px',
-                        border: 'none',
-                        backgroundColor: 'transparent',
-                        color: activeTab === 'all' ? '#007bff' : '#666',
-                        borderBottom:
-                            activeTab === 'all' ? '2px solid #007bff' : 'none',
-                        cursor: 'pointer',
-                        fontSize: '16px',
-                        fontWeight: activeTab === 'all' ? 'bold' : 'normal',
-                    }}
-                >
-                    All Communities ({filteredCommunities.length})
-                </button>
-                {user && (
-                    <button
-                        onClick={() => setActiveTab('my')}
-                        style={{
-                            padding: '12px 24px',
-                            border: 'none',
-                            backgroundColor: 'transparent',
-                            color: activeTab === 'my' ? '#007bff' : '#666',
-                            borderBottom:
-                                activeTab === 'my'
-                                    ? '2px solid #007bff'
-                                    : 'none',
-                            cursor: 'pointer',
-                            fontSize: '16px',
-                            fontWeight: activeTab === 'my' ? 'bold' : 'normal',
-                        }}
-                    >
-                        My Communities ({myCommunities.length})
-                    </button>
-                )}
-            </div>
-
-            {/* Search */}
-            {activeTab === 'all' && (
-                <div style={{ marginBottom: '24px' }}>
-                    <input
-                        type="text"
-                        placeholder="Search communities by name, description, or location..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{
-                            width: '100%',
-                            maxWidth: '500px',
-                            padding: '12px',
-                            border: '1px solid #ddd',
-                            borderRadius: '6px',
-                            fontSize: '14px',
-                            margin: '0 auto',
-                            display: 'block',
-                        }}
-                    />
+            {error && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
                 </div>
             )}
 
-            {/* Communities List */}
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                {activeTab === 'all' ? (
-                    filteredCommunities.length > 0 ? (
-                        filteredCommunities.map((community) => (
-                            <CommunityCard
-                                key={community.id}
-                                community={community}
-                                onJoin={user ? handleJoinCommunity : undefined}
-                                onLeave={
-                                    user ? handleLeaveCommunity : undefined
-                                }
-                                isJoined={isUserMember(community.id)}
-                                isLoading={isLoading}
-                            />
-                        ))
-                    ) : (
-                        <div
-                            style={{
-                                textAlign: 'center',
-                                padding: '40px',
-                                color: '#666',
-                            }}
-                        >
-                            {searchTerm ? (
-                                <>
-                                    <p>
-                                        No communities found matching "
-                                        {searchTerm}"
-                                    </p>
-                                    <button
-                                        onClick={() => setSearchTerm('')}
-                                        style={{
-                                            marginTop: '12px',
-                                            padding: '8px 16px',
-                                            backgroundColor: '#007bff',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                        }}
-                                    >
-                                        Clear Search
-                                    </button>
-                                </>
-                            ) : (
-                                <p>No communities available yet.</p>
-                            )}
-                        </div>
-                    )
-                ) : myCommunities.length > 0 ? (
-                    myCommunities.map((community) => (
-                        <CommunityCard
-                            key={community.id}
-                            community={community}
-                            onLeave={handleLeaveCommunity}
-                            isJoined={true}
-                            isLoading={isLoading}
+            {showCreateForm && (
+                <form
+                    onSubmit={handleCreate}
+                    className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-3"
+                >
+                    <h3 className="text-base font-semibold text-stone-900">New Community</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                            type="text"
+                            required
+                            placeholder="Community name"
+                            value={form.name}
+                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
                         />
-                    ))
-                ) : (
-                    <div
-                        style={{
-                            textAlign: 'center',
-                            padding: '40px',
-                            color: '#666',
-                        }}
-                    >
-                        <p>You haven't joined any communities yet.</p>
-                        <button
-                            onClick={() => setActiveTab('all')}
-                            style={{
-                                marginTop: '12px',
-                                padding: '8px 16px',
-                                backgroundColor: '#007bff',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                            }}
-                        >
-                            Browse Communities
-                        </button>
+                        <input
+                            type="text"
+                            placeholder="City / Location"
+                            value={form.location || ''}
+                            onChange={(e) => setForm({ ...form, location: e.target.value })}
+                            className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                        />
                     </div>
-                )}
+                    <textarea
+                        rows={2}
+                        placeholder="Description"
+                        value={form.description || ''}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                    />
+                    <button
+                        type="submit"
+                        className="rounded-xl bg-emerald-800 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-900"
+                    >
+                        Save Community
+                    </button>
+                </form>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex rounded-xl border border-stone-200 bg-white p-1">
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('all')}
+                        className={`rounded-lg px-4 py-1.5 text-xs font-semibold ${activeTab === 'all' ? 'bg-emerald-800 text-white' : 'text-stone-600'
+                            }`}
+                    >
+                        All ({communities.length})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('my')}
+                        className={`rounded-lg px-4 py-1.5 text-xs font-semibold ${activeTab === 'my' ? 'bg-emerald-800 text-white' : 'text-stone-600'
+                            }`}
+                    >
+                        My Communities ({myCommunities.length})
+                    </button>
+                </div>
+
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        loadData(searchTerm);
+                    }}
+                    className="flex gap-2"
+                >
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search by name or city..."
+                        className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm"
+                    />
+                    <button
+                        type="submit"
+                        className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+                    >
+                        Search
+                    </button>
+                </form>
             </div>
 
-            {/* Info Section */}
-            <div
-                style={{
-                    marginTop: '40px',
-                    padding: '24px',
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: '8px',
-                    maxWidth: '800px',
-                    margin: '40px auto 0',
-                }}
-            >
-                <h3 style={{ marginBottom: '16px', color: '#333' }}>
-                    🌟 Benefits of Joining a Community
-                </h3>
-                <ul style={{ color: '#555', lineHeight: '1.6' }}>
-                    <li>
-                        Get feedback from dedicated scholars in your community
-                    </li>
-                    <li>Connect with fellow learners and share experiences</li>
-                    <li>Participate in group learning sessions and events</li>
-                    <li>Track your progress within a supportive environment</li>
-                    <li>Access to community-specific resources and guidance</li>
-                </ul>
-            </div>
+            {isLoading ? (
+                <div className="py-12 text-center text-sm text-stone-500">Loading communities...</div>
+            ) : displayed.length === 0 ? (
+                <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center text-sm text-stone-500">
+                    No communities found.
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {displayed.map((c) => {
+                        const isMember = myIds.has(c.id);
+                        return (
+                            <div
+                                key={c.id}
+                                className="flex flex-col justify-between rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+                            >
+                                <div>
+                                    <div className="flex items-start justify-between gap-2">
+                                        <h3 className="text-lg font-bold text-stone-900">{c.name}</h3>
+                                        {c.location && (
+                                            <span className="rounded-full bg-sand-100 px-2.5 py-0.5 text-xs font-medium text-stone-700">
+                                                {c.location}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {c.description && (
+                                        <p className="mt-2 text-sm text-stone-600">{c.description}</p>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-3">
+                                    <div className="text-xs text-stone-500">
+                                        {c.member_count !== undefined
+                                            ? `${c.member_count} members • ${c.scholar_count || 0} scholars`
+                                            : 'Active circle'}
+                                    </div>
+                                    {isMember ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleLeave(c.id)}
+                                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                        >
+                                            Leave
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleJoin(c.id)}
+                                            className="rounded-lg bg-emerald-800 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-900"
+                                        >
+                                            Join
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 };

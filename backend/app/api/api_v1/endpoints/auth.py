@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.core.security import verify_password, create_access_token, get_password_hash
 from app.core.config import settings
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, User as UserSchema, Token
 
 router = APIRouter()
@@ -23,14 +23,14 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
             detail="Email or username already registered"
         )
 
-    # Create new user
+    # Always register new accounts as standard USER; scholar/admin roles require admin promotion
     hashed_password = get_password_hash(user.password)
     db_user = User(
         email=user.email,
         username=user.username,
         full_name=user.full_name,
         hashed_password=hashed_password,
-        role=user.role
+        role=UserRole.USER
     )
     db.add(db_user)
     db.commit()

@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-interface AuthFormProps {
-    onSuccess?: () => void;
-}
-
-const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
+const AuthForm: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true);
     const [formData, setFormData] = useState({
-        username: '',
         email: '',
+        username: '',
         password: '',
         full_name: '',
-        role: 'user' as 'user' | 'scholar' | 'admin',
     });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -32,24 +27,20 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                 });
             } else {
                 await register({
-                    username: formData.username,
                     email: formData.email,
+                    username: formData.username,
                     password: formData.password,
                     full_name: formData.full_name || undefined,
-                    role: formData.role,
                 });
             }
-            onSuccess?.();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            setError(err instanceof Error ? err.message : 'Authentication failed');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-    ) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
             ...formData,
             [e.target.name]: e.target.value,
@@ -57,153 +48,121 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
     };
 
     return (
-        <div style={{ maxWidth: '400px', margin: '0 auto', padding: '20px' }}>
-            <h2>{isLogin ? 'Login' : 'Register'}</h2>
+        <div className="mx-auto max-w-md rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-sm">
+            <div className="mb-6 flex rounded-xl bg-stone-100 p-1">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setIsLogin(true);
+                        setError('');
+                    }}
+                    className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${isLogin ? 'bg-white text-emerald-900 shadow-sm' : 'text-stone-600'
+                        }`}
+                >
+                    Sign In
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setIsLogin(false);
+                        setError('');
+                    }}
+                    className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${!isLogin ? 'bg-white text-emerald-900 shadow-sm' : 'text-stone-600'
+                        }`}
+                >
+                    Create Account
+                </button>
+            </div>
 
             {error && (
-                <div
-                    style={{
-                        color: 'red',
-                        backgroundColor: '#ffebee',
-                        padding: '10px',
-                        borderRadius: '4px',
-                        marginBottom: '20px',
-                    }}
-                >
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
                     {error}
                 </div>
             )}
 
-            <form onSubmit={handleSubmit}>
-                <div style={{ marginBottom: '15px' }}>
-                    <label>Username:</label>
-                    <input
-                        type="text"
-                        name="username"
-                        value={formData.username}
-                        onChange={handleChange}
-                        required
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            marginTop: '5px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                        }}
-                    />
-                </div>
-
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {!isLogin && (
                     <>
-                        <div style={{ marginBottom: '15px' }}>
-                            <label>Email:</label>
+                        <div>
+                            <label htmlFor="auth-email" className="mb-1 block text-sm font-medium text-stone-700">
+                                Email
+                            </label>
                             <input
+                                id="auth-email"
                                 type="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
                                 required
-                                style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    marginTop: '5px',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '4px',
-                                }}
+                                placeholder="you@example.com"
+                                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                             />
                         </div>
-
-                        <div style={{ marginBottom: '15px' }}>
-                            <label>Full Name (optional):</label>
+                        <div>
+                            <label htmlFor="auth-fullname" className="mb-1 block text-sm font-medium text-stone-700">
+                                Full Name
+                            </label>
                             <input
+                                id="auth-fullname"
                                 type="text"
                                 name="full_name"
                                 value={formData.full_name}
                                 onChange={handleChange}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    marginTop: '5px',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '4px',
-                                }}
+                                placeholder="Optional"
+                                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                             />
-                        </div>
-
-                        <div style={{ marginBottom: '15px' }}>
-                            <label>Role:</label>
-                            <select
-                                name="role"
-                                value={formData.role}
-                                onChange={handleChange}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    marginTop: '5px',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '4px',
-                                }}
-                            >
-                                <option value="user">
-                                    User (Record and receive feedback)
-                                </option>
-                                <option value="scholar">
-                                    Scholar (Review and provide feedback)
-                                </option>
-                                <option value="admin">
-                                    Admin (Manage users and system)
-                                </option>
-                            </select>
                         </div>
                     </>
                 )}
 
-                <div style={{ marginBottom: '20px' }}>
-                    <label>Password:</label>
+                <div>
+                    <label htmlFor="auth-username" className="mb-1 block text-sm font-medium text-stone-700">
+                        Username
+                    </label>
                     <input
+                        id="auth-username"
+                        type="text"
+                        name="username"
+                        value={formData.username}
+                        onChange={handleChange}
+                        required
+                        placeholder="Enter your username"
+                        className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                    />
+                </div>
+
+                <div>
+                    <label htmlFor="auth-password" className="mb-1 block text-sm font-medium text-stone-700">
+                        Password
+                    </label>
+                    <input
+                        id="auth-password"
                         type="password"
                         name="password"
                         value={formData.password}
                         onChange={handleChange}
                         required
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            marginTop: '5px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                        }}
+                        placeholder="••••••••"
+                        className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                     />
                 </div>
 
                 <button
                     type="submit"
                     disabled={isLoading}
-                    className="btn btn-primary"
-                    style={{ width: '100%', marginBottom: '15px' }}
+                    className="w-full rounded-xl bg-emerald-800 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-50 transition"
                 >
-                    {isLoading ? 'Loading...' : isLogin ? 'Login' : 'Register'}
+                    {isLoading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
                 </button>
             </form>
 
-            <p style={{ textAlign: 'center' }}>
-                {isLogin
-                    ? "Don't have an account? "
-                    : 'Already have an account? '}
-                <button
-                    type="button"
-                    onClick={() => setIsLogin(!isLogin)}
-                    style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#007bff',
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                    }}
-                >
-                    {isLogin ? 'Register' : 'Login'}
-                </button>
-            </p>
+            {isLogin && (
+                <div className="mt-5 rounded-xl bg-sand-100 p-3 text-xs text-stone-600">
+                    <div className="font-semibold text-stone-700 mb-1">Demo Accounts:</div>
+                    <div>Student: <code className="font-mono">testuser</code> / <code className="font-mono">user123</code></div>
+                    <div>Scholar: <code className="font-mono">scholar1</code> / <code className="font-mono">scholar123</code></div>
+                </div>
+            )}
         </div>
     );
 };

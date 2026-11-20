@@ -35,15 +35,34 @@ export interface Comment {
     is_resolved: boolean;
     created_at: string;
     updated_at?: string;
-    scholar?: User;
+    scholar?: {
+        id: number;
+        username: string;
+        full_name?: string;
+    };
 }
 
 export interface Marker {
     id: number;
     recitation_id: number;
+    scholar_id?: number;
     timestamp: number;
     label: string;
     description?: string;
+    category?: string;
+    color?: string;
+    created_at: string;
+}
+
+export interface LoopRegion {
+    id: number;
+    recitation_id: number;
+    scholar_id?: number;
+    start_time: number;
+    end_time: number;
+    label: string;
+    color?: string;
+    is_active: boolean;
     created_at: string;
 }
 
@@ -51,12 +70,20 @@ export interface RecitationWithDetails extends Recitation {
     user?: User;
     comments?: Comment[];
     markers?: Marker[];
+    loop_regions?: LoopRegion[];
 }
 
-export interface RecitationAudioResponse {
-    path: string;
-    media_type?: string;
-    filename?: string;
+export interface StudentProgressStats {
+    total_recitations: number;
+    pending_count: number;
+    reviewed_count: number;
+    needs_revision_count: number;
+    surahs_practiced_count: number;
+    surahs_practiced: string[];
+    total_comments: number;
+    resolved_comments: number;
+    unresolved_comments: number;
+    total_duration_seconds: number;
 }
 
 export interface AuthTokens {
@@ -74,7 +101,6 @@ export interface RegisterData {
     username: string;
     password: string;
     full_name?: string;
-    role?: 'user' | 'scholar' | 'admin';
 }
 
 export interface Community {
@@ -93,28 +119,11 @@ export interface Community {
     members?: User[];
 }
 
-export interface CommunityMembership {
-    id: number;
-    community_id: number;
-    user_id: number;
-    role: string;
-    is_active: boolean;
-    joined_at: string;
-    left_at?: string;
-    user?: User;
-    community?: Community;
-}
-
 export interface CommunityCreate {
     name: string;
     description?: string;
     address?: string;
     location?: string;
-}
-
-export interface CommunityJoinRequest {
-    community_id: number;
-    message?: string;
 }
 
 export interface Donation {
@@ -145,6 +154,22 @@ export interface DonationCreate {
     message?: string;
     is_anonymous?: boolean;
     recurring_interval?: string;
+}
+
+export interface DonationStats {
+    total_donations: number;
+    total_donors: number;
+    monthly_donations: number;
+    yearly_donations: number;
+    average_donation: number;
+    top_donation: number;
+    recent_donations: number;
+}
+
+export interface PaymentInitiationResponse {
+    payment_url: string;
+    transaction_id: string;
+    reference: string;
 }
 
 export interface UserFeedback {

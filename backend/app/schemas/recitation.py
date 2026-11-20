@@ -43,3 +43,17 @@ class RecitationWithDetails(Recitation):
     user: Optional[dict] = None
     comments: Optional[List[dict]] = None
     markers: Optional[List[dict]] = None
+    loop_regions: Optional[List[dict]] = None
+
+
+class StudentProgressStats(BaseModel):
+    total_recitations: int
+    pending_count: int
+    reviewed_count: int
+    needs_revision_count: int
+    surahs_practiced_count: int
+    surahs_practiced: List[str]
+    total_comments: int
+    resolved_comments: int
+    unresolved_comments: int
+    total_duration_seconds: float
